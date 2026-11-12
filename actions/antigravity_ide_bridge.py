@@ -1,5 +1,5 @@
 """
-actions/antigravity_ide_bridge.py — Antigravity IDE Action Bridge for JARVIS Mark 78
+actions/antigravity_ide_bridge.py — Antigravity IDE Action Bridge for JARVIS Mark 108
 Enables JARVIS voice chat, text bar, and Telegram commands to inspect Antigravity IDE status,
 read artifacts, open folders/files in Antigravity, and dispatch coding prompts directly into Antigravity.
 """

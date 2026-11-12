@@ -1,5 +1,5 @@
 """
-core/ai_client.py — High-Availability AI Generation Client for JARVIS Mark 78
+core/ai_client.py — High-Availability AI Generation Client for JARVIS Mark 108
 Provides automatic multi-model fallback and exponential backoff retry across:
 1. gemini-2.5-flash (Primary fast reasoning & structured JSON/Markdown)
 2. gemini-2.5-flash-lite (Ultra-low-latency fallback)

@@ -37,7 +37,7 @@ def search_memory(parameters: dict, player=None) -> str:
         if action in ["save", "remember", "store", "add"]:
             now_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
             fact_entry = f"[{now_str}] {query}"
-            update_memory(category, f"note_{int(datetime.datetime.now().timestamp())}", fact_entry)
+            update_memory({category: {f"note_{int(datetime.datetime.now().timestamp())}": {"value": fact_entry}}})
             
             if player and hasattr(player, "write_log"):
                 player.write_log(f"SYS: [MEMORY VAULT] Saved memory under {category}: '{query}'")
@@ -79,14 +79,25 @@ def search_memory(parameters: dict, player=None) -> str:
         )
         
         if not results or not results['documents'] or not results['documents'][0]:
-            # Fallback to local memory JSON search
+            # Fallback to local memory JSON search (Rust BM25 ranked + substring match)
             local_mem = load_memory()
+            corpus = []
             matches = []
             for cat, val in local_mem.items():
                 if isinstance(val, dict):
                     for k, v in val.items():
+                        corpus.append((f"{cat}/{k}", str(v)))
                         if query.lower() in str(v).lower():
                             matches.append(f"{cat}/{k}: {v}")
+            try:
+                from core.rust_bridge import rank_memories_bm25
+                bm25_hits = rank_memories_bm25(query, corpus, top_k=5)
+                for key_id, text_val, _score in bm25_hits:
+                    entry = f"{key_id}: {text_val}"
+                    if entry not in matches:
+                        matches.append(entry)
+            except Exception:
+                pass
             if matches:
                 return "Found in local memory vault:\n• " + "\n• ".join(matches[:5])
             return "No relevant memories found in vault."

@@ -101,7 +101,7 @@ class SetupOverlay(QWidget):
         layout.setContentsMargins(24, 20, 24, 20)
         layout.setSpacing(8)
 
-        hdr = QLabel("MARK LVIII // INITIALIZATION")
+        hdr = QLabel("MARK 108 // INITIALIZATION")
         hdr.setFont(QFont("Consolas", 11, QFont.Weight.Bold))
         hdr.setStyleSheet(f"color: {C.PRI}; background: transparent;")
         layout.addWidget(hdr)
@@ -239,6 +239,8 @@ class JarvisOpeningScreen(QWidget):
 
         self._step = 0
         self._max_steps = 24  # 24 * 60ms = ~1.44s total boot card duration
+        self._battery_text = "AC POWER // OPTIMAL"
+        self._step_interval = 50
 
         self._seal_ok = True
         try:
@@ -251,6 +253,13 @@ class JarvisOpeningScreen(QWidget):
         self._timer = QTimer(self)
         self._timer.timeout.connect(self._tick)
         self._timer.start(60)
+
+    @property
+    def _current_step(self) -> int:
+        return self._step
+
+    def _on_tick(self):
+        self._tick()
 
     def _tick(self):
         self._step += 1
@@ -297,9 +306,9 @@ class JarvisOpeningScreen(QWidget):
         # Top hairline header
         p.setFont(QFont("Consolas", 8, QFont.Weight.Bold))
         p.setPen(QColor(C.PRI))
-        p.drawText(QRectF(24, 20, 300, 16), Qt.AlignmentFlag.AlignLeft, "J.A.R.V.I.S // MARK LVIII ALPHA CORE")
+        p.drawText(QRectF(24, 20, 300, 16), Qt.AlignmentFlag.AlignLeft, "J.A.R.V.I.S // MARK 108 SOVEREIGN CORE")
         p.setPen(QColor(C.TEXT_DIM))
-        p.drawText(QRectF(self._w - 180, 20, 156, 16), Qt.AlignmentFlag.AlignRight, "REV 58.5 // STEALTH HUD")
+        p.drawText(QRectF(self._w - 180, 20, 156, 16), Qt.AlignmentFlag.AlignRight, "REV 108.0 // STEALTH HUD")
 
         p.setPen(QPen(QColor("#0e2230"), 1.0))
         p.drawLine(QPointF(24, 40), QPointF(self._w - 24, 40))

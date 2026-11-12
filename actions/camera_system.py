@@ -55,26 +55,23 @@ def save_face_profile(name: str, img_bytes: bytes) -> str:
 
 
 def _local_histogram_match(target_bytes: bytes) -> str:
-    """Local OpenCV histogram similarity fallback if API hits rate limits."""
+    """Local face feature similarity fallback powered by `jarvis_rust_core` 256-bin Pearson correlation."""
     try:
+        from core.rust_bridge import compare_grayscale_histograms
         nparr = np.frombuffer(target_bytes, np.uint8)
-        target_img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+        target_img = cv2.imdecode(nparr, cv2.IMREAD_GRAYSCALE)
         if target_img is None:
             return "Could not decode uploaded image."
-
-        target_hist = cv2.calcHist([cv2.cvtColor(target_img, cv2.COLOR_BGR2GRAY)], [0], None, [256], [0, 256])
-        cv2.normalize(target_hist, target_hist, 0, 1, cv2.NORM_MINMAX)
+        target_gray_bytes = target_img.tobytes()
 
         best_name = "Unknown"
         best_score = -1.0
 
         for img_path in FACES_DIR.glob("*.jpg"):
             person_name = img_path.stem.replace("_", " ").title()
-            k_img = cv2.imread(str(img_path), cv2.IMREAD_COLOR)
+            k_img = cv2.imread(str(img_path), cv2.IMREAD_GRAYSCALE)
             if k_img is not None:
-                k_hist = cv2.calcHist([cv2.cvtColor(k_img, cv2.COLOR_BGR2GRAY)], [0], None, [256], [0, 256])
-                cv2.normalize(k_hist, k_hist, 0, 1, cv2.NORM_MINMAX)
-                score = cv2.compareHist(target_hist, k_hist, cv2.HISTCMP_CORREL)
+                score = compare_grayscale_histograms(target_gray_bytes, k_img.tobytes())
                 if score > best_score and score > 0.6:
                     best_score = score
                     best_name = person_name

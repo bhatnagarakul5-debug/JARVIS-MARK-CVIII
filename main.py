@@ -184,7 +184,7 @@ from core.skills_engine import mark_58_skills_control, mark_41_skills_control
 
 from core.parallel_orchestrator import parallel_orchestrator
 
-from core.offline_fallback import offline_fallback
+from core.rust_bridge import offline_fallback
 
 from core.emotional_spectrum import (
 
@@ -2190,7 +2190,7 @@ TOOL_DECLARATIONS = [
 
         "name": "mark_58_control",
 
-        "description": "J.A.R.V.I.S. Mark 78 (Mark LVIII Alpha Core) Dynamic Skills & Suit Control. Creates/authors new Python skill modules on demand, executes custom skills, reloads/lists skill modules, checks parallel sub-brain tasks, toggles desktop floating telemetry HUD, or checks offline fallback status.",
+        "description": "J.A.R.V.I.S. Mark 108 (Mark LVIII Sovereign Core) Dynamic Skills & Suit Control. Creates/authors new Python skill modules on demand, executes custom skills, reloads/lists skill modules, checks parallel sub-brain tasks, toggles desktop floating telemetry HUD, or checks offline fallback status.",
 
         "parameters": {
 
@@ -4518,7 +4518,7 @@ class JarvisLive:
 
                     r = await loop.run_in_executor(None, launch_hud_overlay)
 
-                    result = "Mark 78 Floating HUD Telemetry Launched."
+                    result = "Mark 108 Floating HUD Telemetry Launched."
 
                 elif action == "sub_brain_status":
 
@@ -4532,7 +4532,7 @@ class JarvisLive:
 
                     r = await loop.run_in_executor(None, lambda: mark_58_skills_control(parameters=args, player=self.ui))
 
-                    result = r or "Mark 78 Skills Engine updated."
+                    result = r or "Mark 108 Skills Engine updated."
 
 
 
@@ -5436,7 +5436,7 @@ def main():
 
 
 
-    # Launch Mark 78 Autonomous Daemons (Watchdog, File Watcher, Hardware Equilibrium & RAM Compactor)
+    # Launch Mark 108 Autonomous Daemons (Watchdog, File Watcher, Hardware Equilibrium & RAM Compactor)
 
     autonomous_watchdog.start_watchdog(player=ui)
 

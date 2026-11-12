@@ -1,5 +1,5 @@
 """
-actions/file_processor.py — JARVIS Universal File Analyzer & Editor Engine (Mark 78)
+actions/file_processor.py — JARVIS Universal File Analyzer & Editor Engine (Mark 108)
 
 Supported types & capabilities:
   image   → describe, ocr, analyze, resize, convert, compress

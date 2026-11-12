@@ -1,8 +1,8 @@
 {
-    "main.py": "d4c5cc10df59b5f3eb9572187f2b26914eff6ffc36ec9de9ea6fcf35a3560f7b",
-    "ui.py": "7b26e5cca1e2a60d7d45a98be9c83bf7d36abb8bc837f38e086847e95be6e879",
-    "core/server_security.py": "ece7570bd1030907cdb72bde15c555f57ec0e5200dd6974c8b7981c21cdcd404",
-    "core/hardware_optimizer.py": "cdae0fc4ffc7b23dc7cb69c75e45c446833c6f081e3e873e2fa8025d40efb249",
-    "core/emotional_spectrum.py": "7e692c6654802b16a81fd69ae9a194341bb59eebea9f473dca9083cac76666ec",
+    "main.py": "cdec3ef1ab0c8bd0651cab97f0043c5d8da8f320a7aa24ad634d3eb4972049c4",
+    "ui.py": "c6f02a5f5fd6aa83cbcac5e3f7a80023d7dfe3d09bcafea21328d39f209ae114",
+    "core/server_security.py": "6cb5d3193c9ba8724b50f8a0d47228c418f1565414a1d61e2dc4372bdec39d90",
+    "core/hardware_optimizer.py": "7b26c4e11dd2752b94be1c7c654a22b6d4cf1e0dbf7d567e8a74d7853b7f2329",
+    "core/emotional_spectrum.py": "c34094b3fa1d8aaf9e87b5ff8b83b99824328df03d454ca19e41b2b636f0232e",
     "actions/remote_bridge.py": "5fe4e6f03809a146bf476e22c95dfb034fb2d5ea8ea526be44360cff8eea3ffb"
 }

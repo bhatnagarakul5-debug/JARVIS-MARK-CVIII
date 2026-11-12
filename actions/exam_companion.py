@@ -1,5 +1,5 @@
 """
-actions/exam_companion.py — Academic Exam Companion, Tutor, Study PPT & Document Studio for JARVIS Mark 78
+actions/exam_companion.py — Academic Exam Companion, Tutor, Study PPT & Document Studio for JARVIS Mark 108
 Provides high-level academic intelligence:
 - Document reading, analysis, and syllabus breakdown (PDF, DOCX, PPTX, Images/OCR, Test papers).
 - One-command Study PowerPoint (.pptx) generation from any topic or uploaded lecture PDF/DOCX.
@@ -218,7 +218,7 @@ def exam_companion(parameters: dict, player=None) -> str:
             "file_type": fmt,
             "filename": f"{clean_t}_Study_Guide",
             "title": f"Academic Study Guide: {target_subject.title()}",
-            "subtitle": "J.A.R.V.I.S. Mark 78 Academic & Exam Intelligence Division",
+            "subtitle": "J.A.R.V.I.S. Mark 108 Academic & Exam Intelligence Division",
             "content": output,
             "open_after": True,
         }, player=player)

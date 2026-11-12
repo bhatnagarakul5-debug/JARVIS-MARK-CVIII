@@ -249,8 +249,8 @@ def extract_memory(user_text: str, jarvis_text: str, api_key: str = "") -> dict:
             temperature=0.2,
         )
 
-        clean = raw.strip()
-        clean = re.sub(r"```(?:json)?", "", clean).strip().rstrip("`").strip()
+        from core.rust_bridge import strip_markdown_fences
+        clean = strip_markdown_fences(raw or "")
 
         if not clean or clean == "{}":
             return {}

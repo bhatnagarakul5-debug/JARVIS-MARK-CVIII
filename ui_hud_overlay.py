@@ -1,5 +1,5 @@
 """
-ui_hud_overlay.py — Glassmorphic Floating Desktop HUD Overlay for JARVIS Mark 78
+ui_hud_overlay.py — Glassmorphic Floating Desktop HUD Overlay for JARVIS Mark 108
 Lightweight, frameless, semi-transparent PyQt window showing live system telemetry,
 GPU status, active AI state, and Iron Man Arc-Reactor visualizer.
 Supports both PyQt6 (primary) and PyQt5 (fallback) dynamically.
@@ -23,7 +23,7 @@ except ImportError:
 
 
 class FloatingHUDOverlay(QWidget):
-    """Floating Glassmorphic Desktop HUD Widget for MARK 78."""
+    """Floating Glassmorphic Desktop HUD Widget for MARK 108."""
 
     def __init__(self):
         super().__init__()
@@ -64,7 +64,7 @@ class FloatingHUDOverlay(QWidget):
         layout.setContentsMargins(15, 12, 15, 12)
 
         # Header Label
-        self.title_label = QLabel("J.A.R.V.I.S. MARK 78 // APEX TELEMETRY")
+        self.title_label = QLabel("J.A.R.V.I.S. MARK 108 // APEX TELEMETRY")
         self.title_label.setStyleSheet("color: #00d4ff; font-family: 'Segoe UI', Arial; font-weight: bold; font-size: 10px; letter-spacing: 1px;")
 
         # Status Label
@@ -72,7 +72,7 @@ class FloatingHUDOverlay(QWidget):
         self.status_label.setStyleSheet("color: #e0f7fc; font-family: 'Consolas', monospace; font-size: 11px;")
 
         # AI Mode Tag
-        self.mode_label = QLabel("MARK 78 SUIT: ONLINE [ALPHA CORE]")
+        self.mode_label = QLabel("MARK 108 SUIT: ONLINE [SOVEREIGN CORE]")
         self.mode_label.setStyleSheet("color: #00ff88; font-family: 'Segoe UI', Arial; font-weight: bold; font-size: 10px;")
 
         layout.addWidget(self.title_label)

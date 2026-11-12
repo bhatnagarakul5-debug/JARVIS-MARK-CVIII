@@ -1,5 +1,5 @@
 """
-core/antigravity_bridge.py — Antigravity IDE & AI Workspace Bridge for J.A.R.V.I.S. Mark 78 (Alpha Core)
+core/antigravity_bridge.py — Antigravity IDE & AI Workspace Bridge for J.A.R.V.I.S. Mark 108 (Sovereign Core)
 Enables full 2-way telemetry, workspace opening, artifact reading, and live prompt dispatch
 between JARVIS and the Antigravity AI pair programmer IDE.
 """
@@ -132,7 +132,7 @@ def dispatch_task_to_ide(instruction: str, paste_to_window: bool = False) -> str
         queue_file = scratch_dir / "agent_instruction.json"
         data = {
             "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
-            "sender": "JARVIS Mark 78",
+            "sender": "JARVIS Mark 108",
             "instruction": instruction,
         }
         queue_file.write_text(json.dumps(data, indent=2), encoding="utf-8")

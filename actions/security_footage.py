@@ -1,5 +1,5 @@
 """
-actions/security_footage.py — J.A.R.V.I.S. Mark 78 AI Security Footage Vision & Commentary Engine
+actions/security_footage.py — J.A.R.V.I.S. Mark 108 AI Security Footage Vision & Commentary Engine
 Captures live security camera feed (with automatic screen fallback), analyzes what is seen
 via Gemini 2.5 Multimodal Vision, and delivers intelligent witty, serious, or fun commentary.
 """
@@ -82,7 +82,8 @@ def _capture_screen_frame() -> Tuple[Optional[bytes], str]:
         import mss.tools
         from PIL import Image
 
-        with mss.mss() as sct:
+        mss_cls = getattr(mss, "MSS", mss.mss)
+        with mss_cls() as sct:
             shot = sct.grab(sct.monitors[1])
             png_bytes = mss.tools.to_png(shot.rgb, shot.size)
 
@@ -190,7 +191,7 @@ def capture_security_footage(parameters: dict = None, player=None) -> str:
             )
 
         prompt = (
-            "You are J.A.R.V.I.S., Tony Stark's iconic AI assistant (Mark 78 Alpha Core). "
+            "You are J.A.R.V.I.S., Tony Stark's iconic AI assistant (Mark 108 Sovereign Core). "
             f"You have just acquired a live security visual feed ({capture_type.upper()}). "
             "Examine everything visible in the image: people, posture, expressions, activities, clothing, "
             "objects, clutter, beverages/food, pets, screens, room environment, and any potential security concerns.\n\n"

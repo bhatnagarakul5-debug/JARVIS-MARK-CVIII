@@ -2,7 +2,7 @@ from __future__ import annotations
 
 """
 
-actions/presentation_designer.py — Autonomous High-Impact Presentation Designer Engine for J.A.R.V.I.S. Mark 78
+actions/presentation_designer.py — Autonomous High-Impact Presentation Designer Engine for J.A.R.V.I.S. Mark 108
 
 
 
@@ -604,7 +604,7 @@ def render_footer(slide: Any, theme: Dict[str, Any], deck_title: str, current_id
 
 
 
-    # Footer Center: J.A.R.V.I.S. Mark 78 Signature
+    # Footer Center: J.A.R.V.I.S. Mark 108 Signature
 
     f_center = slide.shapes.add_textbox(Inches(5.0), y + Inches(0.06), Inches(3.333), Inches(0.3))
 
@@ -796,7 +796,7 @@ def render_hero_title_slide(prs: Any, theme: Dict[str, Any], data: Dict[str, Any
 
     p_p2 = tf_p.add_paragraph()
 
-    p_p2.text = f"{org} • Authored with J.A.R.V.I.S. Mark 78 • {date_str}"
+    p_p2.text = f"{org} • Authored with J.A.R.V.I.S. Mark 108 • {date_str}"
 
     p_p2.font.name = "Segoe UI"
 
@@ -2742,7 +2742,7 @@ def _build_fallback_storyboard(topic: str, num_slides: int, theme: str) -> Dict[
 
                 {"step": "02", "title": "Establish Telemetry Loops", "detail": "Track daily efficiency gains and accuracy metrics."},
 
-                {"step": "03", "title": "Scale Full Fleet", "detail": "Standardize Mark 78 intelligence across all workflows."}
+                {"step": "03", "title": "Scale Full Fleet", "detail": "Standardize Mark 108 intelligence across all workflows."}
 
             ],
 
@@ -3190,7 +3190,7 @@ def export_speaker_script(file_path: Union[str, Path], output_md_path: Optional[
 
         f"**Authored:** {datetime.now().strftime('%B %d, %Y')}  ",
 
-        f"**System:** J.A.R.V.I.S. Mark 78 Autonomous Executive Suite  ",
+        f"**System:** J.A.R.V.I.S. Mark 108 Autonomous Executive Suite  ",
 
         f"\n---\n"
 

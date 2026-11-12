@@ -271,31 +271,11 @@ def derive_clean_titles(
 
 def truncate_header_title(text: str, max_chars: int = 48) -> str:
     """
-    Truncates a running header title cleanly on a word boundary with an ellipsis.
-    Never slices a word in half.
+    Truncates a running header title cleanly on a word boundary with an ellipsis
+    using the native `jarvis_rust_core` engine. Never slices a word in half.
     """
-    clean = re.sub(r"\s+", " ", (text or "").strip())
-    if len(clean) <= max_chars:
-        return clean
-
-    words = clean.split(" ")
-    accum: List[str] = []
-    cur_len = 0
-    for w in words:
-        needed = len(w) + (1 if accum else 0)
-        if cur_len + needed > max_chars - 1:
-            break
-        accum.append(w)
-        cur_len += needed
-
-    if not accum:
-        return clean[: max_chars - 1].rstrip() + "…"
-
-    # Strip trailing small prepositions/conjunctions before ellipsis so header looks crisp
-    while len(accum) > 2 and accum[-1].lower().rstrip(":,-") in SMALL_TITLE_WORDS:
-        accum.pop()
-
-    return " ".join(accum).rstrip(" ,;:-") + "…"
+    from core.rust_bridge import truncate_header_title as _truncate_rust
+    return _truncate_rust(text or "", max_chars=max_chars)
 
 
 # ============================================================================
@@ -304,91 +284,21 @@ def truncate_header_title(text: str, max_chars: int = 48) -> str:
 
 def split_glued_bibliography_text(text: str) -> str:
     """
-    Splits bibliography entries that were glued onto the same line.
-    Matches patterns such as:
-    - a DOI (`10.xxxx/...`) or URL (`https://...`) immediately followed by `2. Author` or `[2] Author`
-    - a year `(2023).` or page range `112-125.` immediately followed by `2. Author` or `[2] Author`
+    Delegates glued bibliography entry splitting directly to `jarvis_rust_core`.
     """
-    # When a DOI/URL ends in a digit and is immediately glued to a single-digit entry number like `2. Author, A.`
-    text = re.sub(
-        r"((?:https?://[^\s)\]]+|doi:\s*10\.\d{4,9}/[-._;()/:A-Za-z0-9]+|10\.\d{4,9}/[-._;()/:A-Za-z0-9]+))(?=[1-9]\.\s+[A-Z][a-zA-Z'-]+,\s*[A-Z])",
-        r"\1\n",
-        text,
-        flags=re.IGNORECASE,
-    )
-    # Pattern 1: DOI or URL followed by whitespace or period and numbered entry `2. ` or `[2] `
-    text = re.sub(
-        r"((?:https?://[^\s)\]]+|doi:\s*10\.\d{4,9}/[-._;()/:A-Za-z0-9]+|10\.\d{4,9}/[-._;()/:A-Za-z0-9]+?))(?:\.)?\s+(?=(?:\[\d{1,3}\]|\d{1,3}\.)\s+[A-Z])",
-        r"\1\n",
-        text,
-        flags=re.IGNORECASE,
-    )
-    # Pattern 2: Ending period after year/pages followed immediately by `2. Surname, Initial.`
-    text = re.sub(
-        r"(\([12]\d{3}[a-z]?\)\.|pp?\.\s*\d+[–-]\d+\.)\s*(?=(?:\[\d{1,3}\]|\d{1,3}\.)\s+[A-Z][a-zA-Z'-]+,\s*[A-Z])",
-        r"\1\n",
-        text,
-    )
-    return text
+    from core.rust_bridge import split_glued_bibliography
+    return split_glued_bibliography(text or "")
 
 
 def normalize_markdown_text(raw_text: str) -> str:
     """
-    Normalizes raw markdown before AST parsing:
-    1. Converts literal `\\r\\n` and `\\n` sequences into real newlines (outside inline math/LaTeX commands).
-    2. Normalizes `\r\n` and `\r` to `\n`.
-    3. Detaches `---` horizontal rules glued onto the end of sentences (`...orchestration).---`).
-    4. Detaches ATX headings (`#`, `##`, `###`, `####`) glued onto preceding text.
-    5. Detaches pipe tables glued onto preceding text.
-    6. Splits glued bibliography entries.
+    Delegates raw markdown structural normalization, fenced code protection,
+    glued HR/heading separation, and bibliography un-gluing to `jarvis_rust_core`.
     """
     if not raw_text:
         return ""
-
-    text = str(raw_text)
-
-    # Normalize CRLF -> LF first
-    text = text.replace("\r\n", "\n").replace("\r", "\n")
-
-    # Convert literal '\r\n' and literal '\n' into real newlines when NOT part of a LaTeX macro like \nabla, \neq, \nu, \notin, \natural
-    text = text.replace("\\r\\n", "\n")
-    text = re.sub(r"\\n(?!(?:abla|eq|e|u|otin|atural|exists|eg|less|gtr|leq|geq|subseteq|supseteq|mid|parallel)\b)", "\n", text)
-
-    # Protect fenced code blocks while normalizing surrounding markdown structure
-    fenced_blocks: List[str] = []
-
-    def _stash_fence(match: re.Match) -> str:
-        idx = len(fenced_blocks)
-        fenced_blocks.append(match.group(0))
-        return f"\n\n@@FENCED_CODE_BLOCK_{idx}@@\n\n"
-
-    text = re.sub(r"```[\s\S]*?```", _stash_fence, text)
-
-    # Un-glue "---" attached to the end of a sentence or heading (e.g., "...orchestration).---## Next" or "...text.---")
-    # Avoid touching table separator rows like `|---|---|`
-    text = re.sub(r"([^\n|])\s*---+\s*(?=\n|$|[#A-Za-z0-9*])", r"\1\n\n---\n\n", text)
-    text = re.sub(r"(?m)^\s*---+\s*(?=[^\n\s|-])", "---\n\n", text)
-
-    # Un-glue ATX headings (# to ####) that got glued onto the end of a sentence
-    text = re.sub(r"([^\n#])\s*(#{1,4}\s+[A-Z0-9*])", r"\1\n\n\2", text)
-
-    # Ensure blank line before headings and horizontal rules
-    text = re.sub(r"(?m)^(#{1,4}\s+.+)$", r"\n\1\n", text)
-    text = re.sub(r"(?m)^(\s*---+\s*)$", r"\n\n---\n\n", text)
-
-    # Split glued bibliography entries
-    text = split_glued_bibliography_text(text)
-
-    # Ensure display math $$...$$ is separated smoothly when spanning block boundaries
-    text = re.sub(r"([^\n])\s*(\$\$[\s\S]+?\$\$)\s*([^\n])", r"\1\n\n\2\n\n\3", text)
-
-    # Restore fenced code blocks
-    for idx, block in enumerate(fenced_blocks):
-        text = text.replace(f"@@FENCED_CODE_BLOCK_{idx}@@", block)
-
-    # Collapse 4+ consecutive blank lines to 2 newlines while preserving paragraph separation
-    text = re.sub(r"\n{4,}", "\n\n", text)
-    return text.strip()
+    from core.rust_bridge import normalize_markdown
+    return normalize_markdown(str(raw_text))
 
 
 # ============================================================================
@@ -1868,27 +1778,15 @@ def _fallback_sanitize_markdown(md_text: str) -> str:
 # 7. AUTOMATED POST-BUILD QA GATE & PAGE-1 PNG PREVIEWER
 # ============================================================================
 
-FORBIDDEN_TEXT_PATTERNS = [
-    ("leftover '**' bold marker", re.compile(r"\*\*")),
-    ("leftover '__' bold marker", re.compile(r"__")),
-    ("line starting with '#'", re.compile(r"(?m)^\s*#{1,6}\s+")),
-    ("leftover '---' horizontal rule", re.compile(r"(?<![+>-])---(?![+>-])")),
-    ("leftover '$$' display math delimiter", re.compile(r"\$\$")),
-    ("raw '\\frac' LaTeX command", re.compile(r"\\frac\b")),
-    ("raw '\\sum' LaTeX command", re.compile(r"\\sum\b")),
-    ("leftover '|---|' markdown table separator", re.compile(r"\|\s*:?-{2,}:?\s*\|")),
-    ("literal '\\n' sequence", re.compile(r"\\n(?!(?:abla|eq|e|u|otin|atural|exists|eg)\b)")),
-]
-
-
 def verify_docx_quality(docx_path: Path) -> Dict[str, Any]:
     """
-    Re-opens a saved `.docx` file and enforces all post-build quality checks:
+    Re-opens a saved `.docx` file and enforces all post-build quality checks via `jarvis_rust_core`:
     1. No visible paragraph or table cell text contains `**`, `__`, a line starting with `#`,
        `---`, `$$`, `\\frac`, `\\sum`, `|---|`, or literal `\\n`.
     2. No paragraph exceeds 1200 characters without sentence breaks.
     3. Every heading has content beneath it.
     """
+    from core.rust_bridge import scan_forbidden_docx_patterns
     path = Path(docx_path)
     issues: List[str] = []
 
@@ -1900,32 +1798,21 @@ def verify_docx_quality(docx_path: Path) -> Dict[str, Any]:
     except Exception as e:
         return {"passed": False, "issues": [f"Cannot open .docx archive: {e}"]}
 
-    # Check paragraphs
-    for p_idx, p in enumerate(doc.paragraphs):
-        txt = p.text or ""
-        if not txt.strip():
-            continue
+    # 1. Check paragraphs in a single Rust batch call
+    para_texts = [p.text or "" for p in doc.paragraphs]
+    issues.extend(scan_forbidden_docx_patterns(para_texts))
 
-        for label, pat in FORBIDDEN_TEXT_PATTERNS:
-            if pat.search(txt):
-                issues.append(f"Paragraph {p_idx + 1} contains {label}: {txt[:80]!r}")
-
-        if len(txt) > 1200:
-            # Check for sentence breaks
-            sentence_breaks = re.findall(r"[.!?:;\n]", txt)
-            if len(sentence_breaks) < 2:
-                issues.append(f"Paragraph {p_idx + 1} is {len(txt)} chars with no sentence breaks.")
-
-    # Check table cells
+    # 2. Check table cells via Rust
     for t_idx, table in enumerate(doc.tables):
         for r_idx, row in enumerate(table.rows):
             for c_idx, cell in enumerate(row.cells):
                 c_txt = cell.text or ""
                 if not c_txt.strip():
                     continue
-                for label, pat in FORBIDDEN_TEXT_PATTERNS:
-                    if pat.search(c_txt):
-                        issues.append(f"Table {t_idx + 1} cell ({r_idx},{c_idx}) contains {label}: {c_txt[:60]!r}")
+                cell_issues = scan_forbidden_docx_patterns([c_txt])
+                for ci in cell_issues:
+                    if "chars with no sentence breaks" not in ci:
+                        issues.append(ci.replace("Paragraph 1", f"Table {t_idx + 1} cell ({r_idx},{c_idx})"))
 
     # Check headings have content under them
     body = doc._body._body

@@ -1,5 +1,5 @@
 """
-actions/stunt_bridge.py — JARVIS Mark 78 Bridge & Controller for STUNT
+actions/stunt_bridge.py — JARVIS Mark 108 Bridge & Controller for STUNT
 Complete Two-Way Voice & Application Control of the STUNT Platform on Akul's Laptop:
 1. Application Lifecycle: Launch STUNT desktop app, close STUNT, bring to front, minimize.
 2. Tab & Navigation Voice Control: Switch to Dashboard (Ctrl+1), CGPA Ledger (Ctrl+2),

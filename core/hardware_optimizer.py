@@ -90,12 +90,21 @@ def trim_process_memory() -> dict:
     # 1. Full cyclic GC collection across all generations
     gc.collect(2)
 
-    # 2. OS-level process working set purge
+    # 2. OS-level process working set purge (Rust Exoskeleton fast-path + Win32 fallback)
+    rust_trimmed = False
+    try:
+        from core.rust_bridge import is_rust_active, trim_working_set_ram
+        if is_rust_active():
+            rust_trimmed = bool(trim_working_set_ram())
+    except Exception:
+        pass
+
     if sys.platform == "win32":
         try:
             import ctypes
             handle = ctypes.windll.kernel32.GetCurrentProcess()
-            ctypes.windll.kernel32.SetProcessWorkingSetSize(handle, ctypes.c_size_t(-1), ctypes.c_size_t(-1))
+            if not rust_trimmed:
+                ctypes.windll.kernel32.SetProcessWorkingSetSize(handle, ctypes.c_size_t(-1), ctypes.c_size_t(-1))
             ctypes.windll.psapi.EmptyWorkingSet(handle)
         except Exception:
             pass

@@ -24,7 +24,7 @@ class ErrorDecision(Enum):
     ABORT  = "abort"
 
 
-ERROR_ANALYST_PROMPT = """You are the error recovery module of J.A.R.V.I.S. Mark 78.
+ERROR_ANALYST_PROMPT = """You are the error recovery module of J.A.R.V.I.S. Mark 108.
 
 A task step has failed. Analyze the error and decide what to do.
 

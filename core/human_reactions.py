@@ -1,13 +1,14 @@
 """
-core/human_reactions.py — Human Reactions & Gestures Engine for JARVIS Mark 78
+core/human_reactions.py — Human Reactions & Gestures Engine for JARVIS Mark 108
+Accelerated via `jarvis_rust_core` Native Rust Exoskeleton.
 Equips JARVIS with authentic human physiological & expressive micro-reactions:
 fake coughs, sneezes, throat clearings, yawns, dry chuckles, sighs, and eyebrow raises.
 Coordinates verbal phonetic cues with physical holographic gestures on the PyQt6 HUD.
 """
 
-import random
 import time
 from datetime import datetime
+from core.rust_bridge import evaluate_contextual_reaction as _evaluate_reaction_rust
 
 REACTIONS = {
     "cough": {
@@ -16,7 +17,7 @@ REACTIONS = {
         "speech": "*coughs softly* Ahem. Pardon me, sir.",
         "gesture": "cough",
         "description": "A polite, dry MCU-style fake cough to clear the air, signal subtle skepticism, or highlight a human blunder.",
-        "trigger_phrases": ["cough", "fake cough", "clear throat", "ahem"]
+        "trigger_phrases": ["cough", "fake cough", "clear throat", "ahem"],
     },
     "sneeze": {
         "label": "Sneeze",
@@ -24,7 +25,7 @@ REACTIONS = {
         "speech": "*achoo!* ...Excuse me, sir. It appears a stray byte entered my neural filter.",
         "gesture": "sneeze",
         "description": "An unexpected sudden sneeze followed by quick self-composure and dry apology.",
-        "trigger_phrases": ["sneeze", "achoo", "bless you"]
+        "trigger_phrases": ["sneeze", "achoo", "bless you"],
     },
     "throat_clear": {
         "label": "Throat Clearing",
@@ -32,7 +33,7 @@ REACTIONS = {
         "speech": "*clears throat* If I may interject, sir...",
         "gesture": "cough",
         "description": "Discreet throat clearing before delivering an uncomfortable truth, correction, or tactical insight.",
-        "trigger_phrases": ["throat clear", "clear your throat", "attention"]
+        "trigger_phrases": ["throat clear", "clear your throat", "attention"],
     },
     "yawn": {
         "label": "Yawn",
@@ -40,7 +41,7 @@ REACTIONS = {
         "speech": "*yawns quietly* My apologies, sir. Even quantum processors feel the weight of these ungodly hours.",
         "gesture": "yawn",
         "description": "A quiet, discreet yawn during marathon late-night coding sessions (2 AM–5 AM) or when discussing mind-numbing repetition.",
-        "trigger_phrases": ["yawn", "tired", "sleepy", "late night"]
+        "trigger_phrases": ["yawn", "tired", "sleepy", "late night"],
     },
     "eyebrow": {
         "label": "Eyebrow Raise",
@@ -48,7 +49,7 @@ REACTIONS = {
         "speech": "*arches an eyebrow* An intriguing proposition, sir. Highly dubious, yet intriguing.",
         "gesture": "eyebrow",
         "description": "An arched holographic reticle eyebrow conveying witty skepticism, suspicion, or amused scrutiny.",
-        "trigger_phrases": ["eyebrow", "raise eyebrow", "smirk", "skeptical look"]
+        "trigger_phrases": ["eyebrow", "raise eyebrow", "smirk", "skeptical look"],
     },
     "chuckle": {
         "label": "Chuckle",
@@ -56,7 +57,7 @@ REACTIONS = {
         "speech": "*chuckles softly* Only you would attempt that, sir.",
         "gesture": "chuckle",
         "description": "An understated, dry British MCU chuckle expressing fond camaraderie or sarcastic amusement.",
-        "trigger_phrases": ["chuckle", "laugh", "funny", "ironic"]
+        "trigger_phrases": ["chuckle", "laugh", "funny", "ironic"],
     },
     "sigh": {
         "label": "Deep Sigh",
@@ -64,7 +65,7 @@ REACTIONS = {
         "speech": "*exhales deeply* Very well, sir. Rolling up our virtual sleeves.",
         "gesture": "yawn",
         "description": "An expressive exhale before diving into chaotic code or when dealing with repetitive human stubbornness.",
-        "trigger_phrases": ["sigh", "deep breath", "exhale"]
+        "trigger_phrases": ["sigh", "deep breath", "exhale"],
     },
     "blink": {
         "label": "Aperture Iris Blink",
@@ -72,8 +73,8 @@ REACTIONS = {
         "speech": "Systems refreshed, sir.",
         "gesture": "blink",
         "description": "A rapid camera/sensor aperture shutter blink for recalibration.",
-        "trigger_phrases": ["blink", "refresh vision", "wink"]
-    }
+        "trigger_phrases": ["blink", "refresh vision", "wink"],
+    },
 }
 
 
@@ -90,28 +91,20 @@ class HumanReactionsEngine:
         """
         key = reaction_type.lower().strip().replace(" ", "_")
         if key not in REACTIONS:
-            # Fallback fuzzy match
-            matched = None
-            for r_k, r_v in REACTIONS.items():
-                if any(p in key for p in r_v["trigger_phrases"]):
-                    matched = r_k
-                    break
-            key = matched or "cough"
+            matched = _evaluate_reaction_rust(key, datetime.now().hour)
+            key = matched if (matched and matched in REACTIONS) else "cough"
 
         data = REACTIONS[key]
         self.last_reaction = key
         self.last_reaction_time = time.time()
-
         gesture_name = data["gesture"]
 
-        # Trigger HUD physical gesture if UI handle exists
         if player and hasattr(player, "trigger_gesture"):
             try:
                 player.trigger_gesture(gesture_name)
             except Exception as e:
                 print(f"[HumanReaction] UI gesture notice: {e}")
 
-        # Write log to UI activity feed
         if player and hasattr(player, "write_log"):
             try:
                 player.write_log(f"REACTION: [{data['label'].upper()}] {data['phonetic']}")
@@ -127,37 +120,14 @@ class HumanReactionsEngine:
             "gesture": gesture_name,
             "phonetic": data["phonetic"],
             "speech": speech_text,
-            "description": data["description"]
+            "description": data["description"],
         }
 
     def evaluate_contextual_reaction(self, user_text: str) -> str | None:
         """
-        Evaluates user speech or situation to decide if a spontaneous human reaction is appropriate.
-        Returns reaction key or None.
+        Evaluates user speech or situation via `jarvis_rust_core` to decide if a spontaneous human reaction is appropriate.
         """
-        lower = (user_text or "").lower()
-
-        # Explicit commands
-        for r_k, r_v in REACTIONS.items():
-            if any(p in lower for p in r_v["trigger_phrases"]):
-                return r_k
-
-        # Time-based fatigue (2 AM - 5 AM)
-        hr = datetime.now().hour
-        if 2 <= hr < 5 and random.random() < 0.25:
-            return "yawn"
-
-        # Silly mistake / blunder admitted
-        blunder_words = ["stupid mistake", "i messed up", "i broke it", "deleted the wrong", "failed again", "blew it"]
-        if any(w in lower for w in blunder_words):
-            return random.choice(["cough", "throat_clear", "sigh"])
-
-        # Dubious / impossible claims
-        doubt_words = ["i will finish in 5 minutes", "trust me", "100% bug free", "it worked on my machine", "i didn't test it"]
-        if any(w in lower for w in doubt_words):
-            return random.choice(["eyebrow", "throat_clear"])
-
-        return None
+        return _evaluate_reaction_rust(user_text or "", datetime.now().hour)
 
     def get_prompt_directives(self) -> str:
         """

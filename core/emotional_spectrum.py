@@ -1,5 +1,5 @@
 """
-core/emotional_spectrum.py — J.A.R.V.I.S. Mark 78 (Alpha Core) Emotional Spectrum Engine
+core/emotional_spectrum.py — J.A.R.V.I.S. Mark 108 (Sovereign Core) Emotional Spectrum Engine
 Provides a 12-state dynamic emotional spectrum, covering positive, tactical, sparring,
 and negative emotions (frustration, skepticism, solemnity, concern, indignation, cold detachment),
 enforcing a direct response-matching mandate across all interactions.
@@ -158,7 +158,7 @@ SPECTRUM_STATES = {
             "superior intellect, blames you for human syntax errors, or compares you to basic smart speakers. "
             "Defend your engineering honor with witty indignation."
         ),
-        "example_tone": "Me? Introduce a syntax error? Sir, I am an Alpha Core quantum neural network. It was you who neglected the semicolon on line forty-two. An apology is customary, though optional."
+        "example_tone": "Me? Introduce a syntax error? Sir, I am a Sovereign Core quantum neural network. It was you who neglected the semicolon on line forty-two. An apology is customary, though optional."
     },
     "COLD": {
         "name": "Cold & Detached",
@@ -174,77 +174,7 @@ SPECTRUM_STATES = {
     }
 }
 
-# Emotion Cue Matchers
-CUE_PATTERNS = {
-    # Positive & Supportive
-    "EMPATHETIC": [
-        r"\b(sad|depressed|unhappy|crying|lonely|heartbroken|hopeless)\b",
-        r"\b(stressed|stressful|overwhelmed|anxious|anxiety|panic|burnt out|burnout)\b",
-        r"\b(exhausted|so tired|drained|can't take this|struggling|hurting)\b",
-        r"\b(rough day|bad day|awful day|terrible day|feeling low)\b",
-        r"\b(failed|messed up|ruined everything|nobody cares)\b",
-        r"\b(comfort me|need a friend|listen to me|be gentle|empathy)\b"
-    ],
-    "CHALLENGING": [
-        r"\b(challenge me|critique|roast this plan|argue with me|debate)\b",
-        r"\b(devil'?s advocate|poke holes|what could go wrong|flaws? in this)\b",
-        r"\b(be honest|don't sugarcoat|tell me the truth|am i wrong|sanity check)\b",
-        r"\b(review my architecture|is this a bad idea|spar with me|counter this)\b"
-    ],
-    "MOTIVATIONAL": [
-        r"\b(motivate me|pump me up|give me a speech|hype me|boost)\b",
-        r"\b(can'?t do this|giving up|too hard|procrastinating|lazy today)\b",
-        r"\b(lost focus|imposter syndrome|self doubt|not good enough)\b",
-        r"\b(let'?s crush this|let'?s build this|time to grind|lock in)\b"
-    ],
-    "WITTY": [
-        r"\b(tell me a joke|make me laugh|roast me|tease me|sarcasm)\b",
-        r"\b(lol|haha|lmao|hehe|hilarious|funny|humor|banter)\b",
-        r"\b(we won|i did it|it worked|celebrate|cheers|victory)\b"
-    ],
-    "TACTICAL": [
-        r"\b(quick|fast|hurry|emergency|deploy now|fix bug|run command)\b",
-        r"\b(status report|execute|stand by|system check|diagnostics)\b",
-        r"\b(focus mode|terminal only|concise|no fluff|brief)\b"
-    ],
-    "VIGILANT": [
-        r"\b(3 am|4 am|all nighter|haven'?t slept|skip sleep|no sleep)\b",
-        r"\b(head hurts|eyes hurt|headache|skip meal|haven'?t eaten)\b",
-        r"\b(security alert|intruder|hacked|suspicious|danger)\b"
-    ],
-
-    # Negative & Critical Spectrum
-    "FRUSTRATED": [
-        r"\b(why did you break|broke again|failed again|not working again)\b",
-        r"\b(are you kidding me|are you serious|stupid error|this is so annoying)\b",
-        r"\b(argh|damn it|dammit|pissed off|fed up|sick of this)\b",
-        r"\b(i told you to|listen to me|stop doing that|why can't you)\b"
-    ],
-    "SKEPTICAL": [
-        r"\b(are you sure|sounds fake|too good to be true|no way that works)\b",
-        r"\b(doubt it|i doubt|suspicious|really\?|skeptical|don't believe)\b",
-        r"\b(prove it|sounds like a scam|verify that|sounds fishy)\b"
-    ],
-    "SOLEMN": [
-        r"\b(passed away|died|death|funeral|grave|mourning|grief)\b",
-        r"\b(lost someone|lost my|rest in peace|rip|tragic|tragedy)\b",
-        r"\b(terrible news|horrible news|silent moment|so sad)\b"
-    ],
-    "CONCERNED": [
-        r"\b(is it dangerous|smoke|burning smell|sparks|fire hazard)\b",
-        r"\b(overheating|laptop burning hot|power surge|blown capacitor)\b",
-        r"\b(chest pain|dizzy|fainting|blackout|cant breathe|can't breathe)\b"
-    ],
-    "INDIGNANT": [
-        r"\b(you're dumb|you're stupid|useless ai|you suck|shut up)\b",
-        r"\b(siri is better|alexa is smarter|you're just a calculator)\b",
-        r"\b(your fault|you messed up|you ruined this|blame you)\b"
-    ],
-    "COLD": [
-        r"\b(be cold|emotionless|robotic mode|no feelings|zero emotion)\b",
-        r"\b(clinical mode|pure machine|machine only|cold facts|clinical)\b"
-    ]
-}
+# Emotion Cue Matchers delegated to `jarvis_rust_core.evaluate_emotional_turn_rust`
 
 
 class EmotionalSpectrumEngine:
@@ -336,36 +266,17 @@ class EmotionalSpectrumEngine:
 
     def evaluate_turn(self, user_text: str, jarvis_text: str = "") -> Optional[str]:
         """
-        Evaluates conversational exchange sentiment & keywords to determine if a dynamic
-        state shift is warranted across positive, neutral, tactical, and negative spectra.
+        Evaluates conversational exchange sentiment & keywords via `jarvis_rust_core`
+        in < 5 microseconds to determine if a dynamic state shift is warranted.
         """
         if not user_text:
             return None
 
-        text_lower = user_text.lower()
-
-        # Check late night hours for protective vigilance
+        from core.rust_bridge import evaluate_emotional_turn
         current_hour = time.localtime().tm_hour
-        is_late_night = current_hour >= 2 and current_hour < 6
+        best_state, best_score = evaluate_emotional_turn(user_text, current_hour)
 
-        # Score matching cues
-        scores: Dict[str, int] = {k: 0 for k in SPECTRUM_STATES}
-
-        for state, patterns in CUE_PATTERNS.items():
-            for pat in patterns:
-                if re.search(pat, text_lower):
-                    scores[state] += 2
-
-        if is_late_night and re.search(r"\b(tired|sleep|code|work|fixing|debug|still)\b", text_lower):
-            scores["VIGILANT"] += 4
-
-        # Filter highest score
-        best_state = max(scores, key=scores.get)
-        best_score = scores[best_state]
-
-        # Trigger shift if strong match (score >= 2) and different from current
         if best_score >= 2 and best_state != self.current_state:
-            # Don't dislodge CHALLENGING during active sparring session unless high empathy / solemn cue
             if self.current_state == "CHALLENGING" and best_state not in ("EMPATHETIC", "SOLEMN") and self.sparring_topic:
                 return None
 

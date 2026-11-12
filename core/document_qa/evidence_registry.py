@@ -83,37 +83,18 @@ class EvidenceRegistry:
         doi: Optional[str] = None,
         journal: Optional[str] = None
     ) -> Tuple[SourceTier, str]:
-        """Classifies a source into Tiers 1 through 5 based on authority."""
-        if doi and DOI_REGEX.match(doi.strip()):
-            return SourceTier.TIER_2_SCHOLARLY, "High (Scholarly DOI)"
+        """Classifies a source into Tiers 1 through 5 based on authority via `jarvis_rust_core`."""
+        from core.rust_bridge import evaluate_source_tier as _eval_tier_rust
 
-        if not url:
-            if journal and any(k in journal.lower() for k in ("journal", "ieee", "acm", "proceedings", "nature", "science")):
-                return SourceTier.TIER_2_SCHOLARLY, "High (Peer-Reviewed Journal)"
-            return SourceTier.TIER_4_SECONDARY, "Moderate"
-
-        try:
-            parsed = urllib.parse.urlparse(url.lower())
-            host = parsed.netloc.replace("www.", "")
-        except Exception:
-            host = ""
-
-        for d in PRIMARY_DOMAINS:
-            if host.endswith(d):
-                return SourceTier.TIER_1_PRIMARY, "Highest (Primary/Official)"
-
-        for d in SCHOLARLY_DOMAINS:
-            if host.endswith(d):
-                return SourceTier.TIER_2_SCHOLARLY, "High (Scholarly/Academic)"
-
-        for d in JOURNALISTIC_DOMAINS:
-            if host.endswith(d):
-                return SourceTier.TIER_3_JOURNALISTIC, "Substantial (Reputable Press)"
-
-        if any(h in host for h in ("wikipedia.org", "medium.com", "substack.com", "github.com", "reddit.com")):
-            return SourceTier.TIER_4_SECONDARY, "Moderate (Secondary Commentary)"
-
-        return SourceTier.TIER_5_UNVERIFIED, "Low (Unverified Web)"
+        tier_num, auth = _eval_tier_rust(url=url, doi=doi, journal=journal)
+        tier_map = {
+            1: SourceTier.TIER_1_PRIMARY,
+            2: SourceTier.TIER_2_SCHOLARLY,
+            3: SourceTier.TIER_3_JOURNALISTIC,
+            4: SourceTier.TIER_4_SECONDARY,
+            5: SourceTier.TIER_5_UNVERIFIED,
+        }
+        return tier_map.get(tier_num, SourceTier.TIER_5_UNVERIFIED), auth
 
     def verify_doi(self, evidence: SourceEvidence) -> bool:
         """

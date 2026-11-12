@@ -1,5 +1,5 @@
 """
-actions/college_hub.py — Unified College Data & Academic Knowledge Mesh for JARVIS Mark 78
+actions/college_hub.py — Unified College Data & Academic Knowledge Mesh for JARVIS Mark 108
 Connects JARVIS directly to all aspects of Akul's college ecosystem:
 1. Outlook & College Email: Reads announcements, exam notices, professor emails, and saves lecture attachments.
 2. College Materials Indexer: Discovers and parses PDFs, PPTX lecture slides, Word docs, test files, and image notes.

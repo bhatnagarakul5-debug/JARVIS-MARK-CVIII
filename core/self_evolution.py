@@ -1,5 +1,5 @@
 """
-core/self_evolution.py — Self-Coding & Self-Healing Engine for J.A.R.V.I.S. Mark 78
+core/self_evolution.py — Self-Coding & Self-Healing Engine for J.A.R.V.I.S. Mark 108
 
 1. SELF-CODING (acquire_capability):
    - skill     : When JARVIS lacks a capability, he writes a new Python skill module himself.
@@ -58,13 +58,8 @@ def _log(player, msg: str):
 
 
 def _slug(raw: str, default: str = "item") -> str:
-    s = re.sub(r"[^a-zA-Z0-9_]", "_", (raw or "").strip().lower())
-    s = re.sub(r"_+", "_", s).strip("_")[:48]
-    if not s:
-        s = default
-    if s[0].isdigit():
-        s = f"x_{s}"
-    return s
+    from core.rust_bridge import slugify_identifier
+    return slugify_identifier(raw or "", default_val=default, max_len=48)
 
 
 def _read_json(path: Path, default):
@@ -82,12 +77,8 @@ def _write_json(path: Path, data):
 
 
 def _clean_code(text: str) -> str:
-    text = (text or "").strip()
-    if "```" in text:
-        m = re.search(r"```[a-zA-Z0-9_+-]*\r?\n(.*?)```", text, re.DOTALL)
-        if m:
-            return m.group(1).strip()
-    return text
+    from core.rust_bridge import strip_markdown_fences
+    return strip_markdown_fences(text or "")
 
 
 def _ai(prompt: str) -> str:
@@ -96,7 +87,8 @@ def _ai(prompt: str) -> str:
 
 
 def _public_defs(code: str) -> set:
-    return set(re.findall(r"^def ([a-zA-Z][a-zA-Z0-9_]*)\s*\(", code, re.MULTILINE))
+    from core.rust_bridge import extract_public_defs
+    return set(extract_public_defs(code or ""))
 
 
 def _find_agy() -> Optional[str]:

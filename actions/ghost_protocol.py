@@ -23,9 +23,11 @@ def ghost_protocol(parameters: dict = None, player=None) -> str:
         # 2. Mute audio
         pyautogui.press("volumemute")
         
-        # 3. Clear clipboard
+        # 3. Clear clipboard via native Rust Win32 API + pyperclip fallback
         try:
-            pyperclip.copy("")
+            from core.rust_bridge import wipe_clipboard
+            if not wipe_clipboard():
+                pyperclip.copy("")
         except Exception:
             pass
 

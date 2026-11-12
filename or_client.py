@@ -92,7 +92,7 @@ class OpenRouterClient:
                 "Authorization": f"Bearer {self.api_key}",
                 "Content-Type":  "application/json",
                 "HTTP-Referer":  "https://github.com/mark-xxv",
-                "X-Title":       "J.A.R.V.I.S. Mark 78",
+                "X-Title":       "J.A.R.V.I.S. Mark 108",
             }
 
     def _is_rate_limited(self, model: str) -> bool:

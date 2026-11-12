@@ -1,17 +1,16 @@
 """
-security_audit.py — Pre-Commit Security & Privacy Auditor for JARVIS Mark XL
+security_audit.py — Pre-Commit Security & Privacy Auditor for JARVIS Mark 108
+Accelerated via `jarvis_rust_core` Native Rust Exoskeleton (Rayon 12-Thread Parallel Scanner).
 Scans all files queued for Git commit to ensure 0 API keys, 0 user memories,
 0 passwords, 0 Gmail credentials, and 0 face photos are exposed.
 """
 
-import os
-import re
 import sys
 import subprocess
 from pathlib import Path
 
 try:
-    sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 except Exception:
     pass
 
@@ -31,20 +30,11 @@ FORBIDDEN_FILES = [
     "memory/chroma_db",
 ]
 
-FORBIDDEN_REGEXES = [
-    ("Google API Key", re.compile(r"AIzaSy[A-Za-z0-9_\-]{33}")),
-    ("OpenRouter API Key", re.compile(r"sk-or-v1-[a-f0-9]{48,64}")),
-    ("Anthropic API Key", re.compile(r"sk-ant-api[A-Za-z0-9_\-]{20,}")),
-    ("OpenAI API Key", re.compile(r"sk-proj-[A-Za-z0-9_\-]{20,}")),
-    ("Telegram Bot Token", re.compile(r"\b\d{8,10}:[A-Za-z0-9_\-]{35}\b")),
-    ("Private Key Block", re.compile(r"-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----")),
-]
 
-def run_security_audit():
-    print("=== JARVIS MARK 78 PRE-COMMIT SECURITY AUDIT ===")
+def run_security_audit() -> bool:
+    print("=== JARVIS MARK 108 PRE-COMMIT SECURITY AUDIT ===")
     print(f"Auditing directory: {BASE_DIR}\n")
 
-    # 1. Check Git Status for Forbidden Files
     violations = []
     try:
         status_out = subprocess.check_output(
@@ -67,7 +57,6 @@ def run_security_audit():
     except Exception as e:
         print(f"Notice running git status: {e}")
 
-    # 2. Check Tracked Files Content for Forbidden Patterns
     try:
         ls_out = subprocess.check_output(
             ["git", "ls-files"],
@@ -77,22 +66,9 @@ def run_security_audit():
             stderr=subprocess.DEVNULL,
         )
         tracked_files = [line.strip() for line in ls_out.splitlines() if line.strip()]
-
-        for tf in tracked_files:
-            if tf.endswith("security_audit.py") or tf.endswith(".example"):
-                continue
-            tf_path = BASE_DIR / tf
-            if tf_path.exists() and tf_path.is_file() and not tf.endswith((".png", ".ico", ".jpg", ".zip", ".exe", ".mp3", ".wav")):
-                try:
-                    content = tf_path.read_text(encoding="utf-8", errors="ignore")
-                    for label, rx in FORBIDDEN_REGEXES:
-                        m = rx.search(content)
-                        if m:
-                            snippet = m.group(0)[:8] + "..."
-                            violations.append(f"LEAKED {label} ({snippet}) IN FILE: {tf}")
-                except Exception:
-                    pass
-
+        from core.rust_bridge import audit_files_for_secrets
+        secret_hits = audit_files_for_secrets(str(BASE_DIR), tracked_files)
+        violations.extend(secret_hits)
     except Exception as e:
         print(f"Notice checking tracked files: {e}")
 
@@ -111,6 +87,7 @@ def run_security_audit():
         print("  • All sensitive data successfully shielded by .gitignore.")
         print("------------------------------------------------")
         return True
+
 
 if __name__ == "__main__":
     success = run_security_audit()

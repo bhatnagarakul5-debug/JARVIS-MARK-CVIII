@@ -1,5 +1,5 @@
 """
-core/parallel_orchestrator.py — J.A.R.V.I.S. Mark 78 (Alpha Core) Asynchronous Task Orchestrator
+core/parallel_orchestrator.py — J.A.R.V.I.S. Mark 108 (Sovereign Core) Asynchronous Task Orchestrator
 Executes long-running worker tasks (research, media processing, code generation) in background threads without voice lag.
 """
 
@@ -71,9 +71,9 @@ class ParallelOrchestrator:
             done = list(self.completed_tasks.values())
 
         if not running and not done:
-            return "Mark 78 Parallel Orchestrator: All background sub-brain workers idle."
+            return "Mark 108 Parallel Orchestrator: All background sub-brain workers idle."
 
-        lines = ["=== Mark 78 Parallel Sub-Brain Tasks ==="]
+        lines = ["=== Mark 108 Parallel Sub-Brain Tasks ==="]
         if running:
             lines.append(f"Running Tasks ({len(running)}):")
             for t in running:

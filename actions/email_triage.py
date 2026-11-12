@@ -1,5 +1,5 @@
 """
-actions/email_triage.py — Universal Email, Outlook, Gmail & Unread Messages Intelligence Engine (Mark 78)
+actions/email_triage.py — Universal Email, Outlook, Gmail & Unread Messages Intelligence Engine (Mark 108)
 Capabilities:
 1. Native Microsoft Outlook Desktop (MAPI COM): Reads unread Outlook emails, all recent Outlook emails,
    and meeting invitations directly from the logged-in Windows Outlook client with zero config needed.

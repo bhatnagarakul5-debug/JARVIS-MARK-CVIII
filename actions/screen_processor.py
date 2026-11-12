@@ -1,5 +1,5 @@
 """
-actions/screen_processor.py — Instant Camera Snap, Live Screen Observer & Visual Action Engine (Mark 78)
+actions/screen_processor.py — Instant Camera Snap, Live Screen Observer & Visual Action Engine (Mark 108)
 Capabilities:
 1. Webcam Snap ('camera'): Captures high-clarity photo when user says 'take a snap' or 'take a picture',
    saves to Pictures/JARVIS_Snaps/, and returns witty, observant human-like commentary.

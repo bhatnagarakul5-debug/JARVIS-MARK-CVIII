@@ -94,7 +94,9 @@ def clipboard_manager(parameters: dict, player=None) -> str:
             
         elif action == 'clear':
             clipboard_history.clear()
-            pyperclip.copy("")
+            from core.rust_bridge import wipe_clipboard
+            if not wipe_clipboard():
+                pyperclip.copy("")
             return "Clipboard history has been cleared."
             
         else:

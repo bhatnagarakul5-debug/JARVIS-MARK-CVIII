@@ -1,5 +1,5 @@
 """
-actions/file_controller.py — Full-Laptop File System Controller for J.A.R.V.I.S. Mark 78
+actions/file_controller.py — Full-Laptop File System Controller for J.A.R.V.I.S. Mark 108
 Provides fast laptop-wide file search across all drives (C:, D:, OneDrive, Desktop, Documents, Downloads),
 smart reading of text/Office/PDF files, opening files in default or specified apps, and direct/AI-assisted editing
 of text, code, Word (.docx), PowerPoint (.pptx), and Excel (.xlsx) files.
@@ -181,52 +181,20 @@ def _default_user_roots() -> list[Path]:
 
 
 def _iter_user_files(roots: list[Path], name_query: str = "", ext_query: str = "", max_results: int = 25) -> list[Path]:
-    """Fast pruned directory walker across the entire laptop (skips OS/cache/game bloat)."""
-    q_low = (name_query or "").lower().strip()
-    ext_low = (ext_query or "").lower().strip()
-    if ext_low and not ext_low.startswith("."):
-        ext_low = "." + ext_low
+    """Fast pruned directory walker across the entire laptop powered by `jarvis_rust_core`."""
+    from core.rust_bridge import fast_file_search
 
-    matches = []
-    seen = set()
-    visited_dirs = set()
-
-    for root in roots:
-        if not root or not root.exists():
-            continue
-        try:
-            for dirpath, dirnames, filenames in os.walk(str(root)):
-                dp_low = dirpath.lower()
-                if dp_low in visited_dirs:
-                    dirnames[:] = []
-                    continue
-                visited_dirs.add(dp_low)
-
-                dirnames[:] = [
-                    d for d in dirnames
-                    if d.lower() not in _SKIP_DIRS and not d.startswith(".")
-                ]
-                for fname in filenames:
-                    if fname.startswith("~$") or fname.startswith("."):
-                        continue
-                    f_low = fname.lower()
-                    if ext_low and not f_low.endswith(ext_low):
-                        continue
-                    if q_low and q_low not in f_low:
-                        tokens = [t for t in re.split(r"[\s_\-\.]+", q_low) if len(t) >= 2]
-                        if not tokens or not all(t in f_low for t in tokens):
-                            continue
-                    full_p = Path(dirpath) / fname
-                    key_s = str(full_p).lower()
-                    if key_s in seen:
-                        continue
-                    seen.add(key_s)
-                    matches.append(full_p)
-                    if len(matches) >= max_results:
-                        return matches
-        except Exception:
-            continue
-    return matches
+    exts = [ext_query.strip()] if (ext_query and ext_query.strip()) else []
+    valid_roots = [str(r) for r in roots if r and r.exists()]
+    if not valid_roots:
+        return []
+    found_paths = fast_file_search(
+        root_dirs=valid_roots,
+        query=name_query or "",
+        extensions=exts,
+        max_results=max_results,
+    )
+    return [Path(p) for p in found_paths]
 
 
 def resolve_any_file(path_or_name: str, ext_hint: str = "") -> Path | None:

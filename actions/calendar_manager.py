@@ -1,5 +1,5 @@
 """
-actions/calendar_manager.py — Unified Schedule, Google Calendar, Outlook Calendar & Missed Meetings Engine (Mark 78)
+actions/calendar_manager.py — Unified Schedule, Google Calendar, Outlook Calendar & Missed Meetings Engine (Mark 108)
 Unifies 4 calendar & schedule sources:
 1. Local JARVIS Calendar (config/calendar_events.json)
 2. Microsoft Outlook Calendar (MAPI COM Folder 9 — live appointments & Teams meetings)

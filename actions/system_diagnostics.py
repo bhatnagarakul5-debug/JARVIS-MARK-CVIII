@@ -166,18 +166,9 @@ def optimize_system_ram(player=None) -> str:
         except Exception:
             pass
 
-    # 3. Clean stale __pycache__ .pyc files
-    cleaned_pyc = 0
-    try:
-        for p in BASE_DIR.glob("**/__pycache__"):
-            for f in p.glob("*.pyc"):
-                try:
-                    f.unlink()
-                    cleaned_pyc += 1
-                except Exception:
-                    pass
-    except Exception:
-        pass
+    # 3. Clean stale __pycache__ .pyc files via Native Rust Exoskeleton
+    from core.rust_bridge import clean_pycache
+    cleaned_pyc = clean_pycache(BASE_DIR)
 
     # 4. Quiet non-essential iGPU/RAM background bloatware (Wallpaper overlays, updaters, Copilot hub)
     quieted = _quiet_background_bloat()
@@ -309,7 +300,7 @@ def run_system_diagnostics(parameters: dict, player=None) -> str:
 
     lines = [
         "============================================",
-        "   J.A.R.V.I.S. MARK 78 SYSTEM DIAGNOSTIC",
+        "   J.A.R.V.I.S. MARK 108 SYSTEM DIAGNOSTIC",
         "============================================",
         f"• OS Platform: {platform.system()} {platform.release()} ({platform.machine()})",
         f"• CPU Load: {cpu_pct}% ({cpu_cores} Logical Cores)",

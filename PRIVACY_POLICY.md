@@ -1,6 +1,6 @@
-# J.A.R.V.I.S. Mark 78 — Privacy Policy & Data Sovereignty Charter
+# J.A.R.V.I.S. Mark 108 — Privacy Policy & Data Sovereignty Charter
 **Effective Date:** September 26, 2026  
-**System:** J.A.R.V.I.S. (Just A Rather Very Intelligent System) — Mark 78 (Alpha Core)  
+**System:** J.A.R.V.I.S. (Just A Rather Very Intelligent System) — Mark 108 (Sovereign Core)  
 **Classification:** Confidential & Executive Operating Framework  
 
 ---
@@ -78,4 +78,4 @@ The user retains complete administrative sovereignty over all information stored
 For operational adjustments, permission modifications, or security inquiries regarding this framework:
 - **System Principal:** Akul Bhatnagar
 - **Workstation:** Private Executive Workstation (Windows 11)
-- **Repository:** `JARVIS-MARK-LVIII` (Mark 78 / Mark LVIII Alpha Core)
+- **Repository:** `JARVIS-MARK-LVIII` (Mark 108 / Mark LVIII Sovereign Core)

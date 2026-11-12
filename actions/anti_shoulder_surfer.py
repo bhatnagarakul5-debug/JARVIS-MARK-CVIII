@@ -1,6 +1,6 @@
 """
 actions/anti_shoulder_surfer.py — Sentry Vision Privacy Shield & Anti-Shoulder Surfer Engine
-For J.A.R.V.I.S. Mark 78
+For J.A.R.V.I.S. Mark 108
 
 Protects screen privacy in public spaces (college libraries, cafes, offices):
 1. Background Vision Sentry: Periodically audits webcam frames (every 3.5s).
@@ -79,6 +79,7 @@ class AntiShoulderSurfer:
             img = cv2.imread(str(target_path), cv2.IMREAD_COLOR)
             if img is not None:
                 gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+                self._owner_gray_bytes = gray.tobytes()
                 hist = cv2.calcHist([gray], [0], None, [256], [0, 256])
                 cv2.normalize(hist, hist, 0, 1, cv2.NORM_MINMAX)
                 return hist
@@ -229,6 +230,21 @@ class AntiShoulderSurfer:
             else:
                 small = frame
 
+            # 0. Native Rust Exoskeleton sub-millisecond peeker-zone & motion pre-audit
+            try:
+                from core.rust_bridge import analyze_frame_motion_and_peeker, is_rust_active
+                if is_rust_active():
+                    sh, sw = small.shape[:2]
+                    raw_bytes = small.tobytes()
+                    prev_bytes = getattr(self, "_prev_frame_bytes", b"")
+                    if len(prev_bytes) != len(raw_bytes):
+                        prev_bytes = b""
+                    rust_vis = analyze_frame_motion_and_peeker(prev_bytes, raw_bytes, sw, sh, 3, 25)
+                    self._prev_frame_bytes = raw_bytes
+                    self._last_rust_vision = rust_vis
+            except Exception:
+                pass
+
             # 1. Detect People Count using OpenCV HOG
             person_count = 0
             if self._hog is not None:
@@ -242,9 +258,14 @@ class AntiShoulderSurfer:
             # 2. If 1 person detected, verify if it's the owner or an unrecognized person
             if self._owner_hist is not None:
                 gray = cv2.cvtColor(small, cv2.COLOR_BGR2GRAY)
-                curr_hist = cv2.calcHist([gray], [0], None, [256], [0, 256])
-                cv2.normalize(curr_hist, curr_hist, 0, 1, cv2.NORM_MINMAX)
-                correlation = cv2.compareHist(self._owner_hist, curr_hist, cv2.HISTCMP_CORREL)
+                from core.rust_bridge import compare_grayscale_histograms
+                owner_bytes = getattr(self, "_owner_gray_bytes", b"")
+                if owner_bytes:
+                    correlation = compare_grayscale_histograms(owner_bytes, gray.tobytes())
+                else:
+                    curr_hist = cv2.calcHist([gray], [0], None, [256], [0, 256])
+                    cv2.normalize(curr_hist, curr_hist, 0, 1, cv2.NORM_MINMAX)
+                    correlation = cv2.compareHist(self._owner_hist, curr_hist, cv2.HISTCMP_CORREL)
 
                 # If 1 person is present but their appearance completely mismatches owner (< 0.25)
                 # it's an unrecognized stranger at the screen

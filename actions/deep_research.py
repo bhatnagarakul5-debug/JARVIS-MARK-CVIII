@@ -1,5 +1,5 @@
 """
-actions/deep_research.py — Autonomous Deep Academic & Technical Research Engine for JARVIS Mark 78
+actions/deep_research.py — Autonomous Deep Academic & Technical Research Engine for JARVIS Mark 108
 Equips JARVIS with autonomous multi-source scholarly discovery:
 1. OpenAlex API (250M+ scholarly works, peer-reviewed citations, open access)
 2. CrossRef API (Official DOI registry for published journals and conference proceedings)

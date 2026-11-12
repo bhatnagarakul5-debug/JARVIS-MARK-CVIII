@@ -192,8 +192,29 @@ def _call_tool(tool: str, parameters: dict, speak: Callable | None) -> str:
         from actions.flight_finder import flight_finder
         return flight_finder(parameters=parameters, player=None, speak=speak) or "Done."
 
+    elif tool == "self_evolve":
+        from core.self_evolution import self_evolve
+        return self_evolve(parameters=parameters, player=None) or "Done."
+
     else:
-        raise ValueError(f"Unsupported or unknown tool '{tool}'.")
+        # Mark 108 Sovereign Core: Check dynamic/self-coded skills first, then auto-synthesize if missing
+        from core.skills_engine import skills_engine
+        from core.sovereign_core import SovereignSkillSynthesizer
+
+        skills_engine.discover_skills()
+        if tool in skills_engine.loaded_skills:
+            return skills_engine.run_skill(tool, skill_args=parameters, player=None) or "Done."
+
+        desc = parameters.get("description") or parameters.get("query") or f"Execute capability for {tool}"
+        synth_res = SovereignSkillSynthesizer.synthesize_missing_capability(
+            skill_name=tool,
+            description=str(desc),
+            engine="auto",
+            player=None,
+        )
+        if synth_res.get("status") == "VERIFIED":
+            return skills_engine.run_skill(synth_res["skill_name"], skill_args=parameters, player=None) or "Done."
+        raise ValueError(f"Unsupported or unknown tool '{tool}' (auto-synthesis status: {synth_res.get('status')}).")
 
 
 class AgentExecutor:
@@ -207,6 +228,13 @@ class AgentExecutor:
         cancel_flag: threading.Event | None = None,
     ) -> str:
         print(f"\n[Executor] 🎯 Goal: {goal}")
+        try:
+            from core.sovereign_core import SovereignDeliberationCouncil, SovereignEquilibriumDaemon
+            delib = SovereignDeliberationCouncil.deliberate(goal)
+            telem = SovereignEquilibriumDaemon.sample_telemetry()
+            print(f"[SovereignCore] Council Consensus: {delib['consensus_approved']} (Conf: {delib['aggregate_confidence']}) | Regime: {telem['operating_regime']}")
+        except Exception:
+            pass
 
         replan_attempts = 0
         completed_steps = []
@@ -256,8 +284,20 @@ class AgentExecutor:
                         break
 
                     except Exception as e:
+                        import traceback as _tb
                         error_msg = str(e)
+                        tb_str = _tb.format_exc()
                         print(f"[Executor] ❌ Step {step_num} attempt {attempt} failed: {error_msg}")
+                        if attempt == 1:
+                            try:
+                                from core.sovereign_core import SovereignSelfHealer
+                                heal_res = SovereignSelfHealer.diagnose_and_heal("", error_msg, tb_text=tb_str)
+                                if heal_res.get("healed"):
+                                    print(f"[SovereignCore] Self-healed module '{heal_res.get('module')}' — retrying step {step_num}")
+                                    attempt += 1
+                                    continue
+                            except Exception:
+                                pass
 
                         recovery = analyze_error(step, error_msg, attempt=attempt)
                         decision = recovery["decision"]

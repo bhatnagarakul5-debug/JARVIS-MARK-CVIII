@@ -1,4 +1,4 @@
-# 🤖 J.A.R.V.I.S. Mark 78 (Alpha Core) — Advanced AI Workstation Suite
+# 🤖 J.A.R.V.I.S. Mark 108 (Sovereign Core) — Advanced AI Workstation Suite
 
 > **Creator**: Akul Bhatnagar  
 > **Origin**: India | **Established**: 2025  
@@ -10,7 +10,7 @@
 
 ## 🌟 Overview
 
-**J.A.R.V.I.S. Mark 78 (Alpha Core)** is an autonomous, ultra-low latency AI workstation assistant inspired by Tony Stark's iconic Mark LVIII suit. Built for Windows with full **Intel UHD GPU OpenCL Hardware Acceleration** and **12-Core CPU Thread Tuning**, JARVIS integrates real-time voice interaction, autonomous telephony, OS desktop automation, mobile remote control, cyber security safeguards, and multi-app control.
+**J.A.R.V.I.S. Mark 108 (Sovereign Core)** is an autonomous, ultra-low latency AI workstation assistant inspired by Tony Stark's iconic Mark LVIII suit. Built for Windows with full **Intel UHD GPU OpenCL Hardware Acceleration** and **12-Core CPU Thread Tuning**, JARVIS integrates real-time voice interaction, autonomous telephony, OS desktop automation, mobile remote control, cyber security safeguards, and multi-app control.
 
 ---
 
@@ -92,8 +92,8 @@
 
 ### 1. Clone Repository
 ```bash
-git clone https://github.com/bhatnagarakul5-debug/JARVIS-MARK-LVIII.git
-cd JARVIS-MARK-LVIII
+git clone https://github.com/bhatnagarakul5-debug/JARVIS-MARK-CVIII.git
+cd JARVIS-MARK-CVIII
 ```
 
 ### 2. Run Automated Setup (1-Click)

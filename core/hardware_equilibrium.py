@@ -1,5 +1,5 @@
 """
-core/hardware_equilibrium.py — Hardware Equilibrium & Overload Governor for JARVIS Mark 78
+core/hardware_equilibrium.py — Hardware Equilibrium & Overload Governor for JARVIS Mark 108
 Continuously balances workload across CPU, GPU, RAM, VRAM, and Network outputs.
 Prevents system stalls, UI freezing, audio stutters, and resource starvation by dynamically
 throttling UI framerates, flushing memory, shedding background loads, and shifting compute.

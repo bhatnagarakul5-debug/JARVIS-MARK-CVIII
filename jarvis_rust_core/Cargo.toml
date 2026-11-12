@@ -1,0 +1,24 @@
+[package]
+name = "jarvis_rust_core"
+version = "108.0.0"
+edition = "2021"
+authors = ["Akul Bhatnagar"]
+description = "J.A.R.V.I.S. Mark 108 (Sovereign Core) — High-Performance Rust Exoskeleton Engine"
+
+[lib]
+name = "jarvis_rust_core"
+crate-type = ["cdylib"]
+
+[dependencies]
+pyo3 = { version = "0.23", features = ["extension-module", "abi3-py310", "generate-import-lib"] }
+rayon = "1.10"
+sha2 = "0.10"
+hex = "0.4"
+regex = "1.11"
+walkdir = "2.5"
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 1
+strip = true

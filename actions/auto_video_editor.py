@@ -1,5 +1,5 @@
 """
-actions/auto_video_editor.py — JARVIS Autonomous Video Analyzer, Editor, Color Grader & Subtitle Engine (Mark 78)
+actions/auto_video_editor.py — JARVIS Autonomous Video Analyzer, Editor, Color Grader & Subtitle Engine (Mark 108)
 Works both as a standalone video processing engine (OpenCV + FFmpeg + Gemini 2.5 Flash Multimodal + Live Internet Reference)
 AND as a DaVinci Resolve timeline controller.
 Capabilities:

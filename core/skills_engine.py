@@ -1,5 +1,5 @@
 """
-core/skills_engine.py — J.A.R.V.I.S. Mark 78 (Alpha Core) Dynamic Skills Engine
+core/skills_engine.py — J.A.R.V.I.S. Mark 108 (Sovereign Core) Dynamic Skills Engine
 Dynamically creates, discovers, loads, registers, reloads, and executes action skill modules at runtime.
 """
 
@@ -34,22 +34,13 @@ _PROTECTED_CORE_SKILLS = {
 
 
 def _sanitize_skill_name(raw_name: str) -> str:
-    clean = re.sub(r"[^a-zA-Z0-9_]", "_", (raw_name or "").strip().lower().replace(".py", ""))
-    clean = re.sub(r"_+", "_", clean).strip("_")
-    if not clean or clean[0].isdigit():
-        clean = f"custom_{clean or 'skill'}"
-    return clean
+    from core.rust_bridge import slugify_identifier
+    return slugify_identifier(raw_name or "", default_val="skill", max_len=64)
 
 
 def _clean_generated_code(text: str) -> str:
-    text = (text or "").strip()
-    if "```" in text:
-        m = re.search(r"```[a-zA-Z0-9_+-]*\r?\n(.*?)```", text, re.DOTALL)
-        if m:
-            return m.group(1).strip()
-    text = re.sub(r"^```[a-zA-Z0-9_+-]*\r?\n?", "", text)
-    text = re.sub(r"\r?\n?```$", "", text)
-    return text.strip()
+    from core.rust_bridge import strip_markdown_fences
+    return strip_markdown_fences(text or "")
 
 
 class SkillsEngine:
@@ -117,7 +108,7 @@ class SkillsEngine:
                     "functions": funcs,
                     "path": self.loaded_skills[skill_name]["path"]
                 }
-                return f"Mark 78 Apex Engine: Skill '{skill_name}' successfully reloaded at runtime ({len(funcs)} exported functions)."
+                return f"Mark 108 Apex Engine: Skill '{skill_name}' successfully reloaded at runtime ({len(funcs)} exported functions)."
             except Exception as e:
                 return f"Failed to reload skill '{skill_name}': {e}"
         else:
@@ -130,7 +121,7 @@ class SkillsEngine:
                     "functions": funcs,
                     "path": str(ACTIONS_DIR / f"{skill_name}.py")
                 }
-                return f"Mark 78 Apex Engine: Skill '{skill_name}' dynamically loaded ({len(funcs)} functions: {', '.join(funcs[:5])})!"
+                return f"Mark 108 Apex Engine: Skill '{skill_name}' dynamically loaded ({len(funcs)} functions: {', '.join(funcs[:5])})!"
             except Exception as e:
                 return f"Skill '{skill_name}' not found or invalid: {e}"
 
@@ -150,7 +141,7 @@ class SkillsEngine:
         if not code_to_write:
             try:
                 from core.ai_client import generate_text_with_retry
-                prompt = f"""You are the J.A.R.V.I.S. Mark 78 Skill Architect.
+                prompt = f"""You are the J.A.R.V.I.S. Mark 108 Skill Architect.
 Write a complete, self-contained, production-ready Python action skill module for `actions/{clean_name}.py`.
 
 Skill Name: `{clean_name}`
@@ -183,7 +174,7 @@ CRITICAL REQUIREMENTS:
         if not valid_syntax:
             safe_desc = (description or clean_name).replace('"""', "'''")
             code_to_write = f'''"""
-actions/{clean_name}.py — Custom J.A.R.V.I.S. Mark 78 Skill Module
+actions/{clean_name}.py — Custom J.A.R.V.I.S. Mark 108 Skill Module
 Capability: {safe_desc}
 """
 
@@ -273,7 +264,7 @@ def {clean_name}(parameters: Dict[str, Any] = None, player=None) -> str:
     def list_skills(self) -> str:
         """Lists all active loaded skills and their exported functions."""
         self.discover_skills()
-        lines = [f"=== J.A.R.V.I.S. Mark 78 Active Skill Modules ({len(self.loaded_skills)}) ==="]
+        lines = [f"=== J.A.R.V.I.S. Mark 108 Active Skill Modules ({len(self.loaded_skills)}) ==="]
         for name, data in sorted(self.loaded_skills.items()):
             fn_count = len(data['functions'])
             tag = "[CORE]" if name in _PROTECTED_CORE_SKILLS else "[CUSTOM]"
@@ -285,7 +276,7 @@ skills_engine = SkillsEngine()
 
 
 def mark_58_skills_control(parameters: dict, player=None) -> str:
-    """Action handler for Mark 78 Alpha Core Dynamic Skills Control."""
+    """Action handler for Mark 108 Sovereign Core Dynamic Skills Control."""
     params = parameters or {}
     action = (params.get("action") or "list").lower().strip()
     skill_name = (params.get("skill_name") or params.get("name") or "").strip()
