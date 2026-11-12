@@ -1,5 +1,5 @@
 # actions/send_message.py
-# MARK LVIII — Universal Multi-App Messaging & Calling Engine
+# MARK CVIII (MARK 108 SOVEREIGN CORE) — Universal Multi-App Messaging & Calling Engine
 # Supports: WhatsApp, Discord (Ctrl+K), Telegram, Microsoft Teams (Ctrl+E),
 # Slack (Ctrl+K), Instagram, LinkedIn, Phone Link, and Active Window Chat.
 # Uses Zero-Latency URI/Direct Launch + Native UIA (agent_desktop) + Clipboard Paste (Ctrl+V).

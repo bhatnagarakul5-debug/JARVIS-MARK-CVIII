@@ -78,4 +78,4 @@ The user retains complete administrative sovereignty over all information stored
 For operational adjustments, permission modifications, or security inquiries regarding this framework:
 - **System Principal:** Akul Bhatnagar
 - **Workstation:** Private Executive Workstation (Windows 11)
-- **Repository:** `JARVIS-MARK-LVIII` (Mark 108 / Mark LVIII Sovereign Core)
+- **Repository:** `JARVIS-MARK-CVIII` (MARK CVIII / Mark 108 Sovereign Core)

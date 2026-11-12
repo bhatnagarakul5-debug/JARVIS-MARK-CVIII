@@ -1,5 +1,5 @@
 """
-actions/ghost_protocol.py — Instant Stealth & Privacy Engine for JARVIS Mark XL
+actions/ghost_protocol.py — Instant Stealth & Privacy Engine for JARVIS Mark 108 (MARK CVIII — Sovereign Core)
 Minimizes all windows, mutes audio, clears clipboard, and hides sensitive UI.
 """
 

@@ -1,5 +1,5 @@
 """
-actions/file_watcher.py — Smart Downloads & Desktop File Watcher for JARVIS Mark XLII
+actions/file_watcher.py — Smart Downloads & Desktop File Watcher for JARVIS Mark 108 (MARK CVIII — Sovereign Core)
 Monitors the Downloads directory in real time for newly downloaded files.
 Auto-organizes new files, parses documents/PDFs, and notifies the user via HUD log and Telegram!
 """

@@ -118,7 +118,7 @@ class TelegramRemoteBridge:
             
             if chat_id and self.bot_token:
                 menu_msg = (
-                    "⚡ J.A.R.V.I.S. MARK XLI ONLINE\n\n"
+                    "⚡ J.A.R.V.I.S. MARK CVIII (MARK 108 SOVEREIGN CORE) ONLINE\n\n"
                     "Good day sir! All laptop systems are operational. Tap any button below for 1-click remote control:"
                 )
                 self._send_menu_buttons(chat_id, menu_msg)

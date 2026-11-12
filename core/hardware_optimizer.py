@@ -1,5 +1,5 @@
 """
-core/hardware_optimizer.py — Hardware Acceleration & Latency Optimization Engine for JARVIS Mark XL
+core/hardware_optimizer.py — Hardware Acceleration & Latency Optimization Engine for JARVIS Mark 108 (MARK CVIII — Sovereign Core)
 Tailored for Dell Inspiron 15 (Intel UHD Graphics, 16GB RAM, 12 Core CPU, 512GB SSD)
 Enables OpenCL GPU acceleration, Windows High Process Priority, UI macro acceleration, and RAM garbage collection.
 """

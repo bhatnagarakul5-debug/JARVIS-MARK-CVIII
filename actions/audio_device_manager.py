@@ -1,5 +1,5 @@
 """
-actions/audio_device_manager.py — Dynamic Audio Device & Bluetooth/Jack Switcher for JARVIS Mark XL
+actions/audio_device_manager.py — Dynamic Audio Device & Bluetooth/Jack Switcher for JARVIS Mark 108 (MARK CVIII — Sovereign Core)
 Allows switching audio output/input devices dynamically between Speakers, Bluetooth Headphones, and 3.5mm Audio Jack.
 """
 

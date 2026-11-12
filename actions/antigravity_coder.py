@@ -1,5 +1,5 @@
 """
-actions/antigravity_coder.py — Antigravity Autonomous Coder & Self-Evolution Engine for JARVIS Mark XLI
+actions/antigravity_coder.py — Antigravity Autonomous Coder & Self-Evolution Engine for JARVIS Mark 108 (MARK CVIII — Sovereign Core)
 Enables JARVIS to autonomously write new code, refactor multi-file software projects,
 diagnose runtime errors, and self-edit / self-upgrade his own codebase using Antigravity!
 """

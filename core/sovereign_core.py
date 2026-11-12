@@ -30,8 +30,8 @@ ACTIONS_DIR = BASE_DIR / "actions"
 MEMORY_DIR = BASE_DIR / "memory"
 SOVEREIGN_STATE_PATH = MEMORY_DIR / "sovereign_state.json"
 
-MARK_VERSION = "Mark 108 (Sovereign Core)"
-LEGACY_RELEASE_BASELINE = "Mark 78 (Alpha Core)"
+MARK_VERSION = "Mark 108 (MARK CVIII — Sovereign Core)"
+LEGACY_RELEASE_BASELINE = "MARK CVIII (Mark 108 Sovereign Core)"
 
 
 class OperatingRegime(str, Enum):

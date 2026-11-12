@@ -1,5 +1,5 @@
 """
-actions/spotify_control.py — AI Voice DJ & Spotify Mood Sync Engine for JARVIS Mark XL
+actions/spotify_control.py — AI Voice DJ & Spotify Mood Sync Engine for JARVIS Mark 108 (MARK CVIII — Sovereign Core)
 Supports playback controls, mood playlists (war_mode, coding, chill, focus, workout), URI search, and volume control.
 """
 

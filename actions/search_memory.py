@@ -1,5 +1,5 @@
 """
-actions/search_memory.py — Instant Memory Vault Engine for JARVIS Mark XL
+actions/search_memory.py — Instant Memory Vault Engine for JARVIS Mark 108 (MARK CVIII — Sovereign Core)
 Saves & searches long-term memories, facts, notes, and reminders in ChromaDB vector memory.
 """
 

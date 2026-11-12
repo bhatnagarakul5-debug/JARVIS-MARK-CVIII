@@ -1,5 +1,5 @@
 """
-actions/archive_intel.py — The Internet Archive & Wayback Machine Intelligence Engine for JARVIS Mark XL
+actions/archive_intel.py — The Internet Archive & Wayback Machine Intelligence Engine for JARVIS Mark 108 (MARK CVIII — Sovereign Core)
 Allows searching Wayback Machine snapshots of any website and searching Archive.org's library of books, docs & media.
 """
 

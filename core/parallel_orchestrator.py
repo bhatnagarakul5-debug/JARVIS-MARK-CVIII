@@ -16,7 +16,7 @@ class ParallelOrchestrator:
     def __new__(cls):
         if cls._instance is None:
             cls._instance = super().__new__(cls)
-            cls._instance.executor = ThreadPoolExecutor(max_workers=6, thread_name_prefix="Mark58_SubBrain")
+            cls._instance.executor = ThreadPoolExecutor(max_workers=6, thread_name_prefix="Mark108_CVIII_SubBrain")
             cls._instance.active_tasks = {}
             cls._instance.completed_tasks = {}
             cls._instance._lock = threading.Lock()

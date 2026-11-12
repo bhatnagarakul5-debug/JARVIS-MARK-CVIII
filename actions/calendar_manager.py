@@ -154,7 +154,7 @@ def _fetch_google_calendar_events() -> list[dict]:
 
     if ics_url and ics_url.startswith("http"):
         try:
-            req = urllib.request.Request(ics_url, headers={"User-Agent": "JARVIS-Mark58/1.0"})
+            req = urllib.request.Request(ics_url, headers={"User-Agent": "JARVIS-MARK-CVIII-108/1.0"})
             with urllib.request.urlopen(req, timeout=5) as resp:
                 ics_data = resp.read(500_000).decode("utf-8", errors="ignore")
             collected.extend(_parse_ics_text(ics_data, source_label="Google Calendar"))

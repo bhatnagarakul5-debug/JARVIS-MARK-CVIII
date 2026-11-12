@@ -1,5 +1,5 @@
 """
-actions/agent_desktop.py — Vercel Labs agent-desktop Integration for J.A.R.V.I.S. Mark LVIII
+actions/agent_desktop.py — Vercel Labs agent-desktop Integration for J.A.R.V.I.S. Mark 108 (MARK CVIII — Sovereign Core)
 Deterministic computer use via native OS accessibility trees (UI Automation on Windows).
 Replaces slow, fragile screenshot/vision coordinate guessing with rock-solid semantic refs.
 """

@@ -1,5 +1,5 @@
 """
-core/omniroute_client.py — J.A.R.V.I.S. Mark XLI OmniRoute Proxy & Rate-Limit Fallback Engine
+core/omniroute_client.py — J.A.R.V.I.S. Mark 108 (MARK CVIII — Sovereign Core) OmniRoute Proxy & Rate-Limit Fallback Engine
 Offloads heavy content generation (file processing, vision, document chat) to local OmniRoute
 or fallback free providers whenever 429 rate limits occur on primary endpoints.
 """

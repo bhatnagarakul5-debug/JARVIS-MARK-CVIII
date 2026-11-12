@@ -445,7 +445,7 @@ class NativeOrbCore(QWidget):
 
 class HolographicOrbWindow(QMainWindow):
     """
-    Solid Shape Holographic Orb & Extended Sleek Taskbar for J.A.R.V.I.S. Mark LVIII.
+    Solid Shape Holographic Orb & Extended Sleek Taskbar for J.A.R.V.I.S. Mark 108 (MARK CVIII Sovereign Core).
     - True Solid Shapes: Circle orb + capsule taskbar with ZERO rectangular fillers.
     - Native Hardware Dragging: Direct Win32 WM_NCLBUTTONDOWN on orb move with 0 latency.
     - Full-Feature Extended Taskbar: 840px wide sleek capsule with model switcher, long prompt,
@@ -939,7 +939,7 @@ class MainWindow(QMainWindow):
 
     def __init__(self, face_path: str = ""):
         super().__init__()
-        self.setWindowTitle("J.A.R.V.I.S // MARK LVIII")
+        self.setWindowTitle("J.A.R.V.I.S // MARK CVIII (MARK 108 SOVEREIGN CORE)")
         self.setAcceptDrops(True)
         self.setWindowFlags(
             Qt.WindowType.FramelessWindowHint |

@@ -214,7 +214,7 @@ def {clean_name}(parameters: Dict[str, Any] = None, player=None) -> str:
         return (
             f"Skill '{clean_name}' created, syntax-verified, and hot-loaded at `{target_path}`.\n"
             f"Status: {load_msg}\n"
-            f"You can invoke it anytime via `mark_58_control(action='run_skill', skill_name='{clean_name}')`."
+            f"You can invoke it anytime via `mark_108_control(action='run_skill', skill_name='{clean_name}')`."
         )
 
     def run_skill(self, skill_name: str, skill_args: Optional[dict] = None, player=None) -> str:
@@ -275,7 +275,7 @@ def {clean_name}(parameters: Dict[str, Any] = None, player=None) -> str:
 skills_engine = SkillsEngine()
 
 
-def mark_58_skills_control(parameters: dict, player=None) -> str:
+def mark_108_skills_control(parameters: dict, player=None) -> str:
     """Action handler for Mark 108 Sovereign Core Dynamic Skills Control."""
     params = parameters or {}
     action = (params.get("action") or "list").lower().strip()
@@ -308,5 +308,5 @@ def mark_58_skills_control(parameters: dict, player=None) -> str:
 
 
 # Backward compatibility aliases
-mark_41_skills_control = mark_58_skills_control
-mark_45_skills_control = mark_58_skills_control
+mark_cviii_skills_control = mark_108_skills_control
+mark_skills_control = mark_108_skills_control

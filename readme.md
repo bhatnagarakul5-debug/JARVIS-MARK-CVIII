@@ -10,7 +10,7 @@
 
 ## 🌟 Overview
 
-**J.A.R.V.I.S. Mark 108 (Sovereign Core)** is an autonomous, ultra-low latency AI workstation assistant inspired by Tony Stark's iconic Mark LVIII suit. Built for Windows with full **Intel UHD GPU OpenCL Hardware Acceleration** and **12-Core CPU Thread Tuning**, JARVIS integrates real-time voice interaction, autonomous telephony, OS desktop automation, mobile remote control, cyber security safeguards, and multi-app control.
+**J.A.R.V.I.S. Mark 108 (Sovereign Core)** is an autonomous, ultra-low latency AI workstation assistant architected as the MARK CVIII (Mark 108 Sovereign Core) suit. Built for Windows with full **Intel UHD GPU OpenCL Hardware Acceleration** and **12-Core CPU Thread Tuning**, JARVIS integrates real-time voice interaction, autonomous telephony, OS desktop automation, mobile remote control, cyber security safeguards, and multi-app control.
 
 ---
 

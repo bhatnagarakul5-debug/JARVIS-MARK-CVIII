@@ -1,5 +1,5 @@
 """
-actions/war_mode.py — Tactical War Protocol & High-Performance Battle Engine for JARVIS Mark XL
+actions/war_mode.py — Tactical War Protocol & High-Performance Battle Engine for JARVIS Mark 108 (MARK CVIII — Sovereign Core)
 Handles War Mode activation/deactivation, Crimson HUD visual transformation, CPU priority locking,
 Telegram battle alerts, and on-demand app launching with zero voice changes.
 """

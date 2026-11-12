@@ -180,7 +180,7 @@ from actions.call_manager import call_manager_control
 
 from core.autonomous_watchdog import autonomous_watchdog
 
-from core.skills_engine import mark_58_skills_control, mark_41_skills_control
+from core.skills_engine import mark_108_skills_control, mark_cviii_skills_control
 
 from core.parallel_orchestrator import parallel_orchestrator
 
@@ -2188,9 +2188,9 @@ TOOL_DECLARATIONS = [
 
     {
 
-        "name": "mark_58_control",
+        "name": "mark_108_control",
 
-        "description": "J.A.R.V.I.S. Mark 108 (Mark LVIII Sovereign Core) Dynamic Skills & Suit Control. Creates/authors new Python skill modules on demand, executes custom skills, reloads/lists skill modules, checks parallel sub-brain tasks, toggles desktop floating telemetry HUD, or checks offline fallback status.",
+        "description": "J.A.R.V.I.S. Mark 108 (MARK CVIII Sovereign Core) Dynamic Skills & Suit Control. Creates/authors new Python skill modules on demand, executes custom skills, reloads/lists skill modules, checks parallel sub-brain tasks, toggles desktop floating telemetry HUD, or checks offline fallback status.",
 
         "parameters": {
 
@@ -2216,9 +2216,9 @@ TOOL_DECLARATIONS = [
 
     {
 
-        "name": "mark_41_control",
+        "name": "mark_cviii_control",
 
-        "description": "Alias for mark_58_control. Dynamically reloads/loads python skill modules, checks parallel sub-brain tasks, toggles desktop floating telemetry HUD, or checks offline fallback status.",
+        "description": "Alias for mark_108_control (MARK CVIII Sovereign Core). Dynamically reloads/loads python skill modules, checks parallel sub-brain tasks, toggles desktop floating telemetry HUD, or checks offline fallback status.",
 
         "parameters": {
 
@@ -4508,7 +4508,7 @@ class JarvisLive:
 
 
 
-            elif name in ("mark_58_control", "mark_41_control", "mark_45_control"):
+            elif name in ("mark_108_control", "mark_cviii_control"):
 
                 action = args.get("action", "list_skills")
 
@@ -4530,7 +4530,7 @@ class JarvisLive:
 
                 else:
 
-                    r = await loop.run_in_executor(None, lambda: mark_58_skills_control(parameters=args, player=self.ui))
+                    r = await loop.run_in_executor(None, lambda: mark_108_skills_control(parameters=args, player=self.ui))
 
                     result = r or "Mark 108 Skills Engine updated."
 

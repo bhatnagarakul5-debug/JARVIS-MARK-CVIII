@@ -1,5 +1,5 @@
 """
-actions/camera_system.py — Fail-Safe Telegram Face Profile Memory Engine for JARVIS Mark XL
+actions/camera_system.py — Fail-Safe Telegram Face Profile Memory Engine for JARVIS Mark 108 (MARK CVIII — Sovereign Core)
 Supports multimodal AI vision recognition with automatic fallback to local histogram feature matching.
 Clean string encoding for Windows CMD.
 """

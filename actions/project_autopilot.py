@@ -1,5 +1,5 @@
 """
-actions/project_autopilot.py — Stark One-Command Workspace & Project Builder for JARVIS Mark XL
+actions/project_autopilot.py — Stark One-Command Workspace & Project Builder for JARVIS Mark 108 (MARK CVIII — Sovereign Core)
 Automates creation of new coding projects, directory structures, boilerplate files, and VS Code / DaVinci launch.
 """
 
@@ -47,7 +47,7 @@ def create_project_workspace(parameters: dict, player=None) -> str:
             created_files.append("main.py")
 
             readme_md = target_dir / "README.md"
-            readme_md.write_text(f"# {project_name}\n\nAutomated workspace created by J.A.R.V.I.S. Mark XL.\n", encoding="utf-8")
+            readme_md.write_text(f"# {project_name}\n\nAutomated workspace created by J.A.R.V.I.S. Mark 108 (MARK CVIII — Sovereign Core).\n", encoding="utf-8")
             created_files.append("README.md")
 
             requirements_txt = target_dir / "requirements.txt"

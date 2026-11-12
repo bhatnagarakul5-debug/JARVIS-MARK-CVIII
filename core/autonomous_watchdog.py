@@ -1,5 +1,5 @@
 """
-core/autonomous_watchdog.py — Autonomous System Auto-Healing Watchdog for JARVIS Mark XLII
+core/autonomous_watchdog.py — Autonomous System Auto-Healing Watchdog for JARVIS Mark 108 (MARK CVIII — Sovereign Core)
 Monitors live audio stream health, RAM utilization, and Wi-Fi network connectivity in the background.
 Executes zero-latency auto-healing re-connections if network stutters occur.
 """

@@ -82,7 +82,7 @@ RULES:
 
 
 
-- For tools like file_generator, presentation_designer, code_helper, dev_agent, and mark_58_control: call the tool immediately and then clearly report the generated file path, slide count, code status, or newly created skill to the user in 1–2 crisp sentences.
+- For tools like file_generator, presentation_designer, code_helper, dev_agent, and mark_108_control: call the tool immediately and then clearly report the generated file path, slide count, code status, or newly created skill to the user in 1–2 crisp sentences.
 
 
 
@@ -594,19 +594,19 @@ TOOL SELECTION:
 
 
 
-- mark_58_control → when user asks to CREATE/MAKE A NEW SKILL, RUN A CUSTOM SKILL, reload skill modules, list skills, check background sub-brain worker status, or toggle HUD overlay telemetry:
+- mark_108_control → when user asks to CREATE/MAKE A NEW SKILL, RUN A CUSTOM SKILL, reload skill modules, list skills, check background sub-brain worker status, or toggle HUD overlay telemetry:
 
 
 
-  * To create a new skill: call `mark_58_control(action="create_skill", skill_name="<snake_case_name>", description="<what the skill should do>")`.
+  * To create a new skill: call `mark_108_control(action="create_skill", skill_name="<snake_case_name>", description="<what the skill should do>")`.
 
 
 
-  * To execute/run a skill: call `mark_58_control(action="run_skill", skill_name="<snake_case_name>", skill_args="<input or JSON>")`.
+  * To execute/run a skill: call `mark_108_control(action="run_skill", skill_name="<snake_case_name>", skill_args="<input or JSON>")`.
 
 
 
-  * To reload or list skills: call `mark_58_control(action="reload_skills", skill_name="...")` or `mark_58_control(action="list_skills")`.
+  * To reload or list skills: call `mark_108_control(action="reload_skills", skill_name="...")` or `mark_108_control(action="list_skills")`.
 
 
 

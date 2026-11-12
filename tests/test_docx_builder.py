@@ -111,7 +111,7 @@ def test_running_header_word_boundary_truncation():
 def test_full_synthetic_fixture_build_and_qa_gate(tmp_path: Path):
     """Tests all features together on the synthetic fixture and saves Page 1 PNG."""
     out_docx = tmp_path / "Synthetic_Full_Fixture.docx"
-    artifact_png = Path("C:/Users/Akul/OneDrive/Desktop/Developer Work/Jarvis-Mark-XL/scratch/final_qa_artifacts/docx_builder_page1.png")
+    artifact_png = Path(__file__).resolve().parent.parent / "scratch" / "final_qa_artifacts" / "docx_builder_page1.png"
 
     meta = {
         "output_path": out_docx,

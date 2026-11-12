@@ -191,7 +191,7 @@ def _search_reddit_json(query: str, max_results: int = 3) -> list:
     results = []
     try:
         url = f"https://www.reddit.com/search.json?q={urllib.parse.quote_plus(query)}&limit={max_results}&sort=relevance"
-        req = urllib.request.Request(url, headers={**_HEADERS, "User-Agent": "JARVIS-Mark58/1.0"})
+        req = urllib.request.Request(url, headers={**_HEADERS, "User-Agent": "JARVIS-MARK-CVIII-108/1.0"})
         with urllib.request.urlopen(req, timeout=5) as resp:
             data = json.loads(resp.read().decode("utf-8", errors="ignore"))
         for child in data.get("data", {}).get("children", [])[:max_results]:

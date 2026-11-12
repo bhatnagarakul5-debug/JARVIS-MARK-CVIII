@@ -1,5 +1,5 @@
 # actions/open_app.py
-# MARK LVIII — Universal Zero-Latency Laptop App Launcher & Lifecycle Hook
+# MARK CVIII (MARK 108 SOVEREIGN CORE) — Universal Zero-Latency Laptop App Launcher & Lifecycle Hook
 # Directly hooked into Akul's Dell 15 (C: & D: drives, MSIX Store Apps, Registry Store & Start Menu)
 
 import os
