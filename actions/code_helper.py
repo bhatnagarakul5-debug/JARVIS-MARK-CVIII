@@ -12,11 +12,24 @@
 #   auto         → (default) Intent auto-detected from context
 
 import subprocess
+import shlex
 import sys
 import json
 import re
 import time
 from pathlib import Path
+from core.ai_client import generate_text_with_retry
+import builtins as _builtins
+
+
+def print(*args, **kwargs):  # noqa: A001 — console-safe logging (emoji on cp1252 consoles)
+    try:
+        _builtins.print(*args, **kwargs)
+    except (UnicodeEncodeError, OSError, AttributeError, ValueError):
+        try:
+            _builtins.print(*[str(a).encode("ascii", "replace").decode("ascii") for a in args], **kwargs)
+        except Exception:
+            pass
 
 
 def get_base_dir():
@@ -24,9 +37,19 @@ def get_base_dir():
         return Path(sys.executable).parent
     return Path(__file__).resolve().parent.parent
 
+
+def _get_desktop_dir() -> Path:
+    onedrive_desk = Path.home() / "OneDrive" / "Desktop"
+    if onedrive_desk.exists():
+        return onedrive_desk
+    desk = Path.home() / "Desktop"
+    desk.mkdir(parents=True, exist_ok=True)
+    return desk
+
+
 BASE_DIR           = get_base_dir()
 API_CONFIG_PATH    = BASE_DIR / "config" / "api_keys.json"
-DESKTOP            = Path.home() / "Desktop"
+DESKTOP            = _get_desktop_dir()
 MAX_BUILD_ATTEMPTS = 3
 GEMINI_MODEL       = "gemini-2.5-flash"
 
@@ -36,20 +59,36 @@ def _get_api_key() -> str:
         return json.load(f)["gemini_api_key"]
 
 
+class _SimpleResp:
+    def __init__(self, text: str):
+        self.text = text
+
+
+class _GenAIModelWrapper:
+    def __init__(self, model_name: str):
+        self.model_name = model_name
+
+    def generate_content(self, prompt: str):
+        txt = generate_text_with_retry(prompt)
+        return _SimpleResp(txt)
+
+
 def _get_gemini(model: str = GEMINI_MODEL):
-    import google.generativeai as genai
-    genai.configure(api_key=_get_api_key())
-    return genai.GenerativeModel(model)
+    return _GenAIModelWrapper(model)
 
 
 def _clean_code(text: str) -> str:
     text = text.strip()
-    text = re.sub(r"^```[a-zA-Z]*\n?", "", text)
-    text = re.sub(r"\n?```$", "", text)
+    if "```" in text:
+        m = re.search(r"```[a-zA-Z0-9_+-]*\r?\n(.*?)```", text, re.DOTALL)
+        if m:
+            return m.group(1).strip()
+    text = re.sub(r"^```[a-zA-Z0-9_+-]*\r?\n?", "", text)
+    text = re.sub(r"\r?\n?```$", "", text)
     return text.strip()
 
 
-def _resolve_save_path(output_path: str, language: str) -> Path:
+def _resolve_save_path(output_path: str, language: str, description: str = "") -> Path:
     ext_map = {
         "python": ".py", "py": ".py",
         "javascript": ".js", "js": ".js",
@@ -59,10 +98,19 @@ def _resolve_save_path(output_path: str, language: str) -> Path:
         "bash": ".sh", "shell": ".sh", "powershell": ".ps1",
         "sql": ".sql", "json": ".json", "rust": ".rs", "go": ".go",
     }
+    ext = ext_map.get((language or "python").lower(), ".py")
     if output_path:
         p = Path(output_path)
+        if not p.suffix:
+            p = p.with_suffix(ext)
         return p if p.is_absolute() else DESKTOP / p
-    ext = ext_map.get((language or "python").lower(), ".py")
+    if description:
+        words = re.findall(r"[a-zA-Z0-9]+", description.lower())
+        stop = {"write", "create", "make", "build", "a", "an", "the", "in", "for", "to", "python", "script", "code", "program", "file", "that", "with"}
+        meaningful = [w for w in words if w not in stop][:4]
+        if meaningful:
+            slug = "_".join(meaningful)
+            return DESKTOP / f"{slug}{ext}"
     return DESKTOP / f"jarvis_code{ext}"
 
 
@@ -177,7 +225,12 @@ Code:"""
 
     response = model.generate_content(prompt)
     code     = _clean_code(response.text)
-    path     = _resolve_save_path(output_path, lang)
+    path     = _resolve_save_path(output_path, lang, description)
+    if path.suffix.lower() == ".py":
+        try:
+            compile(code, path.name, "exec")
+        except SyntaxError as syn_err:
+            code = _fix_code(code, f"SyntaxError: {syn_err}", description)
     _save_file(path, code)
     return code, path
 
@@ -216,9 +269,16 @@ def _run_file(path: Path, args: list, timeout: int) -> str:
     if not interp:
         return f"No interpreter for {path.suffix}."
 
+    if isinstance(args, str):
+        arg_list = shlex.split(args) if args.strip() else []
+    elif isinstance(args, list):
+        arg_list = [str(a) for a in args]
+    else:
+        arg_list = []
+
     try:
         result = subprocess.run(
-            interp + [str(path)] + (args or []),
+            interp + [str(path)] + arg_list,
             capture_output=True, text=True,
             encoding="utf-8", errors="replace",
             timeout=timeout, cwd=str(path.parent)

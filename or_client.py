@@ -82,13 +82,18 @@ _rate_limited: dict[str, float] = {}
 class OpenRouterClient:
 
     def __init__(self) -> None:
-        self.api_key  = _load_api_key()
-        self._headers = {
-            "Authorization": f"Bearer {self.api_key}",
-            "Content-Type":  "application/json",
-            "HTTP-Referer":  "https://github.com/mark-xxv",
-            "X-Title":       "MARK XXV",
-        }
+        self.api_key: Optional[str] = None
+        self._headers: dict = {}
+
+    def _ensure_initialized(self) -> None:
+        if not self.api_key:
+            self.api_key = _load_api_key()
+            self._headers = {
+                "Authorization": f"Bearer {self.api_key}",
+                "Content-Type":  "application/json",
+                "HTTP-Referer":  "https://github.com/mark-xxv",
+                "X-Title":       "J.A.R.V.I.S. Mark 78",
+            }
 
     def _is_rate_limited(self, model: str) -> bool:
         ts = _rate_limited.get(model)
@@ -114,6 +119,7 @@ class OpenRouterClient:
         temperature: float = DEFAULT_TEMPERATURE,
         response_format: Optional[dict] = None,
     ) -> Optional[str]:
+        self._ensure_initialized()
         payload: dict = {
             "model":       model,
             "messages":    messages,

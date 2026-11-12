@@ -23,10 +23,11 @@ class OmniRouteClient:
         try:
             if CONFIG_PATH.exists():
                 with open(CONFIG_PATH, "r", encoding="utf-8") as f:
-                    return json.load(f).get("gemini_api_key", "")
+                    data = json.load(f)
+                    return data.get("omniroute_api_key", "local-omniroute")
         except Exception:
             pass
-        return ""
+        return "local-omniroute"
 
     def is_omniroute_running(self) -> bool:
         """Checks if local OmniRoute gateway is active on port 20128."""

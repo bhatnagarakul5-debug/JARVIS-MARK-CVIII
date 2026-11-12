@@ -1,5 +1,5 @@
 """
-core/server_security.py — Server & Endpoint Security Hardening Engine for J.A.R.V.I.S. Mark 58
+core/server_security.py — Server & Endpoint Security Hardening Engine for J.A.R.V.I.S. Mark 78
 
 Provides defensive server security features and endpoint hardening:
 1. Localhost Binding Enforcer: Asserts that all local listeners bind strictly to 127.0.0.1 / ::1.
@@ -18,12 +18,14 @@ import os
 import sys
 import time
 import json
+import hmac
 import psutil
 import ctypes
 import base64
 import hashlib
 import re
 import random
+import threading
 from pathlib import Path
 from datetime import datetime
 from typing import Dict, List, Optional, Tuple, Any, Union
@@ -72,6 +74,7 @@ class RateLimiter:
         self.max_calls = max_calls
         self.time_window = time_window_sec
         self._clients: Dict[str, List[float]] = {}
+        self._lock = threading.Lock()
 
     def is_allowed(self, client_id: str) -> Tuple[bool, int]:
         """
@@ -81,24 +84,25 @@ class RateLimiter:
         now = time.time()
         client_key = str(client_id)
 
-        if client_key not in self._clients:
-            self._clients[client_key] = []
+        with self._lock:
+            if client_key not in self._clients:
+                self._clients[client_key] = []
 
-        # Purge calls older than the time window
-        self._clients[client_key] = [t for t in self._clients[client_key] if (now - t) < self.time_window]
+            # Purge calls older than the time window
+            self._clients[client_key] = [t for t in self._clients[client_key] if (now - t) < self.time_window]
 
-        if len(self._clients[client_key]) >= self.max_calls:
-            log_security_event(
-                "RATE_LIMIT_EXCEEDED",
-                "WARN",
-                f"Rate limit of {self.max_calls} req/{self.time_window}s exceeded.",
-                client_id=client_key
-            )
-            return False, 0
+            if len(self._clients[client_key]) >= self.max_calls:
+                log_security_event(
+                    "RATE_LIMIT_EXCEEDED",
+                    "WARN",
+                    f"Rate limit of {self.max_calls} req/{self.time_window}s exceeded.",
+                    client_id=client_key
+                )
+                return False, 0
 
-        self._clients[client_key].append(now)
-        remaining = self.max_calls - len(self._clients[client_key])
-        return True, remaining
+            self._clients[client_key].append(now)
+            remaining = self.max_calls - len(self._clients[client_key])
+            return True, remaining
 
 
 _DEFAULT_RATE_LIMITER = RateLimiter(max_calls=20, time_window_sec=60.0)
@@ -162,7 +166,7 @@ class EndpointAuthGuard:
         if not self._secret_passkey:
             return False
 
-        if candidate_passkey.strip() == self._secret_passkey:
+        if hmac.compare_digest(candidate_passkey.strip(), self._secret_passkey):
             cid = str(chat_id).strip()
             self._authorized_chat_ids.add(cid)
             self._persist_authorized_id(cid)
@@ -408,7 +412,7 @@ def format_security_scan_report(scan_results: Dict[str, Any]) -> str:
     pointers = scan_results.get("pointers", [])
 
     lines = [
-        "## 🛡️ J.A.R.V.I.S. Mark 58 — Endpoint Security & Open Port Audit",
+        "## 🛡️ J.A.R.V.I.S. Mark 78 — Endpoint Security & Open Port Audit",
         f"**Timestamp:** {scan_results.get('timestamp')}  ",
         f"**Active TCP Listeners:** {total} total ({len(safe)} localhost-isolated, {len(exposed)} network-bound)  ",
         "\n---\n",
@@ -773,11 +777,12 @@ class DestructiveActionGuard:
             log_security_event("CHALLENGE_EXPIRED", "INFO", f"Expired challenge for '{ch['action']}'")
             return False, None, "Verification code has expired. Request cancelled."
 
-        if str(candidate_code).strip() == ch["code"]:
+        if hmac.compare_digest(str(candidate_code).strip(), str(ch["code"])):
             action = ch["action"]
+            target = ch.get("target")
             cb = ch["callback"]
             self._active_challenge = None
-            res = None
+            res = target
             if cb and callable(cb):
                 try:
                     res = cb()
@@ -870,9 +875,12 @@ def unlock_protocol_blackout(passkey: str, ui_handle: Optional[Any] = None) -> T
     """
     global _SYSTEM_LOCKED
     _AUTH_GUARD._load_config()
-    expected_passkey = _AUTH_GUARD._secret_passkey or "jarvis-override"
+    expected_passkey = (_AUTH_GUARD._secret_passkey or os.environ.get("JARVIS_SECURITY_PASSKEY", "")).strip()
+    if not expected_passkey:
+        log_security_event("UNLOCK_BLOCKED_NO_PASSKEY", "ALERT", "Unlock attempted but security_passkey is not configured in config/api_keys.json.")
+        return False, "❌ Unlock failed: Set 'security_passkey' in config/api_keys.json first."
 
-    if passkey.strip() == expected_passkey.strip():
+    if hmac.compare_digest(passkey.strip().encode("utf-8"), expected_passkey.encode("utf-8")):
         _SYSTEM_LOCKED = False
         log_security_event("SYSTEM_UNLOCKED", "INFO", "Protocol Blackout disengaged via valid passkey.")
 

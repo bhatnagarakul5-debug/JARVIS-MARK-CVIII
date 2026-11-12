@@ -32,26 +32,46 @@ class AgentDesktop:
         self._last_snapshot: Optional[Dict[str, Any]] = None
 
     def _locate_binary(self) -> str:
-        """Finds agent-desktop or agent-desktop-win32-x64 binary."""
-        # 1. Check system PATH
+        """Finds native agent-desktop-win32-x64.exe first (shell=False safe), then agent-desktop."""
+        appdata = os.environ.get("APPDATA", "")
+        if appdata:
+            native_exe = (
+                Path(appdata)
+                / "npm"
+                / "node_modules"
+                / "agent-desktop"
+                / "bin"
+                / "agent-desktop-win32-x64.exe"
+            )
+            if native_exe.exists():
+                return str(native_exe)
+
+        exe_in_path = shutil.which("agent-desktop-win32-x64")
+        if exe_in_path:
+            return exe_in_path
+
         path_bin = shutil.which("agent-desktop")
         if path_bin:
             return path_bin
 
-        # 2. Check npm global paths on Windows
-        appdata = os.environ.get("APPDATA", "")
-        npm_bin = Path(appdata) / "npm" / "agent-desktop.cmd"
-        if npm_bin.exists():
-            return str(npm_bin)
+        if appdata:
+            npm_bin = Path(appdata) / "npm" / "agent-desktop.cmd"
+            if npm_bin.exists():
+                return str(npm_bin)
 
-        # 3. Fallback to direct name
         return "agent-desktop"
 
     def run_cmd(self, args: List[str], timeout: int = 25) -> Dict[str, Any]:
         """
         Executes an agent-desktop CLI command and returns parsed JSON.
+        Uses shell=False whenever native binary (.exe) is resolved.
         """
-        cmd = [self._bin_path] + [str(a) for a in args]
+        use_shell = self._bin_path.lower().endswith((".cmd", ".bat"))
+        clean_args = [str(a) for a in args]
+        if use_shell:
+            # Strip shell metacharacters when invoking via .cmd shim
+            clean_args = [a.replace("&", "").replace("|", "").replace(";", "").replace("`", "") for a in clean_args]
+        cmd = [self._bin_path] + clean_args
         try:
             res = subprocess.run(
                 cmd,
@@ -60,7 +80,8 @@ class AgentDesktop:
                 encoding="utf-8",
                 errors="replace",
                 timeout=timeout,
-                shell=(sys.platform == "win32")
+                shell=use_shell,
+                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
             )
             stdout = res.stdout.strip()
             if not stdout and res.stderr:
@@ -125,7 +146,10 @@ class AgentDesktop:
 
     def focus_window(self, title_or_app: str) -> Dict[str, Any]:
         """Brings an application window to the foreground."""
-        return self.run_cmd(["focus-window", title_or_app])
+        res = self.run_cmd(["focus-window", "--title", title_or_app])
+        if not res.get("ok"):
+            res = self.run_cmd(["focus-window", "--app", title_or_app])
+        return res
 
     def launch(self, app_name: str, activate: bool = True) -> Dict[str, Any]:
         """Launches a desktop application."""
@@ -260,9 +284,15 @@ class AgentDesktop:
 
     def wait(self, element_ref: Optional[str] = None, timeout_ms: int = 5000) -> Dict[str, Any]:
         """Waits for element or event."""
-        args = ["wait", "--timeout", str(timeout_ms)]
         if element_ref:
-            args.extend(["--element", element_ref.strip("'\""), "--predicate", "actionable"])
+            args = [
+                "wait",
+                "--element", element_ref.strip("'\""),
+                "--predicate", "actionable",
+                "--timeout", str(timeout_ms),
+            ]
+        else:
+            args = ["wait", str(timeout_ms)]
         return self.run_cmd(args, timeout=(timeout_ms // 1000) + 5)
 
 
@@ -317,12 +347,13 @@ def agent_desktop_control(parameters: Dict[str, Any], player=None) -> str:
             res = ad.find(target, app=app or None, role=params.get("role"))
             if res.get("ok"):
                 data = res.get("data", {})
-                elements = data.get("elements", []) if isinstance(data, dict) else data
+                elements = data.get("matches", data.get("elements", [])) if isinstance(data, dict) else data
                 if not elements:
                     return f"No matching UI elements found for '{target}'."
                 lines = [f"Found {len(elements)} element(s) matching '{target}':"]
                 for el in elements[:8]:
-                    lines.append(f"• Ref: `{el.get('ref')}` | Role: {el.get('role')} | Name: '{el.get('name')}'")
+                    ref_id = el.get("ref_id") or el.get("ref")
+                    lines.append(f"• Ref: `{ref_id}` | Role: {el.get('role')} | Name: '{el.get('name')}'")
                 return "\n".join(lines)
             err = res.get("error", {})
             return f"Find failed: {err.get('code')} — {err.get('message')}"
@@ -338,9 +369,9 @@ def agent_desktop_control(parameters: Dict[str, Any], player=None) -> str:
                 find_res = ad.find(target, app=app or None)
                 if find_res.get("ok"):
                     data = find_res.get("data", {})
-                    els = data.get("elements", []) if isinstance(data, dict) else (data if isinstance(data, list) else [])
+                    els = data.get("matches", data.get("elements", [])) if isinstance(data, dict) else (data if isinstance(data, list) else [])
                     if els:
-                        ref = els[0].get("ref", "")
+                        ref = els[0].get("ref_id") or els[0].get("ref", "")
                     else:
                         return f"Could not find any UI element named '{target}' to click."
                 else:
@@ -361,9 +392,9 @@ def agent_desktop_control(parameters: Dict[str, Any], player=None) -> str:
                 find_res = ad.find(target, app=app or None)
                 if find_res.get("ok"):
                     data = find_res.get("data", {})
-                    els = data.get("elements", []) if isinstance(data, dict) else (data if isinstance(data, list) else [])
+                    els = data.get("matches", data.get("elements", [])) if isinstance(data, dict) else (data if isinstance(data, list) else [])
                     if els:
-                        ref = els[0].get("ref", "")
+                        ref = els[0].get("ref_id") or els[0].get("ref", "")
                     else:
                         return f"Could not find UI field '{target}' to type into."
                 else:
@@ -395,37 +426,114 @@ def agent_desktop_control(parameters: Dict[str, Any], player=None) -> str:
             err = res.get("error", {})
             return f"Focus failed: {err.get('code')} — {err.get('message')}"
 
-        # 8. Launch App
+        # 8. Launch App (uses universal open_app map first, then UIA launch fallback)
         elif action in ("launch", "open_app"):
             app_to_launch = target or app
             if not app_to_launch:
                 return "Please provide an application name to launch."
+            try:
+                from actions.open_app import open_app
+                launch_res = open_app({"app_name": app_to_launch}, player=player)
+                if "Launched " in launch_res:
+                    return launch_res
+            except Exception:
+                pass
             res = ad.launch(app_to_launch)
             if res.get("ok"):
                 return f"Launched application '{app_to_launch}'."
             err = res.get("error", {})
             return f"Launch failed: {err.get('code')} — {err.get('message')}"
 
+        # 8b. Universal 1-Command App Pilot (Launch/Focus -> Find -> Click -> Type -> Snapshot)
+        elif action in ("use_app", "pilot", "open_and_do", "control_app"):
+            app_name = app or target
+            if not app_name:
+                return "Please specify 'app' (application name) to pilot."
+            if player and hasattr(player, "set_state"):
+                player.set_state("PILOTING")
+            if player and hasattr(player, "write_log"):
+                player.write_log(f"UIA // PILOTING {app_name.upper()}")
+
+            steps_done = []
+            # Step 1: Focus existing window or launch via open_app
+            foc = ad.focus_window(app_name)
+            if not foc.get("ok"):
+                from actions.open_app import open_app
+                open_app({"app_name": app_name}, player=player)
+                import time
+                time.sleep(1.8)
+                ad.focus_window(app_name)
+                steps_done.append(f"Launched & focused '{app_name}'")
+            else:
+                steps_done.append(f"Focused '{app_name}'")
+
+            # Step 2: If a target UI element was specified, find & click/type into it
+            ui_target = target if (app and target and target != app) else params.get("element", "")
+            if ui_target:
+                ref = ui_target
+                if not ref.startswith("@"):
+                    f_res = ad.find(ui_target, app=app_name)
+                    if f_res.get("ok"):
+                        data = f_res.get("data", {})
+                        els = data.get("matches", data.get("elements", [])) if isinstance(data, dict) else (data if isinstance(data, list) else [])
+                        if els:
+                            ref = els[0].get("ref_id") or els[0].get("ref", "")
+                        else:
+                            ref = ""
+                if ref and ref.startswith("@"):
+                    if text:
+                        t_res = ad.type_text(ref, text)
+                        if t_res.get("ok"):
+                            steps_done.append(f"Typed '{text}' into {ref} ({ui_target})")
+                        else:
+                            ad.click(ref, headed=headed)
+                            steps_done.append(f"Clicked {ref} ({ui_target})")
+                    else:
+                        c_res = ad.click(ref, headed=headed)
+                        if c_res.get("ok"):
+                            steps_done.append(f"Clicked {ref} ({ui_target})")
+                else:
+                    steps_done.append(f"Element '{ui_target}' not directly matched; returning live controls")
+            elif text:
+                # Type directly or press key combo if no specific element ref was given
+                ad.press(text)
+                steps_done.append(f"Sent key/input '{text}'")
+
+            # Step 3: Capture concise interactive controls so Gemini can continue seamlessly
+            snap = ad.snapshot(app=app_name, compact=True, interactive_only=True)
+            snap_preview = ""
+            if snap.get("ok"):
+                raw = json.dumps(snap.get("data", {}))
+                snap_preview = f"\nActive Controls in {app_name}: {raw[:1200]}"
+            return " | ".join(steps_done) + snap_preview
+
         # 9. List Apps / Windows
         elif action in ("list_apps", "apps"):
             res = ad.list_apps()
             if res.get("ok"):
-                apps_list = res.get("data", {}).get("apps", [])
+                data = res.get("data", {})
+                apps_list = data.get("apps", []) if isinstance(data, dict) else (data if isinstance(data, list) else [])
                 if not apps_list:
                     return "No running GUI applications detected."
-                return "Running GUI applications:\n• " + "\n• ".join(apps_list[:15])
+                formatted = [
+                    f"{a.get('name', 'App')} (PID {a.get('pid', '?')})" if isinstance(a, dict) else str(a)
+                    for a in apps_list[:15]
+                ]
+                return "Running GUI applications:\n• " + "\n• ".join(formatted)
             return f"List apps failed: {res.get('error', {}).get('message')}"
 
         elif action in ("list_windows", "windows"):
             res = ad.list_windows(app=app or None)
             if res.get("ok"):
-                wins = res.get("data", [])
+                data = res.get("data", [])
+                wins = data.get("windows", []) if isinstance(data, dict) else (data if isinstance(data, list) else [])
                 if not wins:
                     return "No visible windows found."
                 lines = ["Visible Windows:"]
                 for w in wins[:10]:
                     title = w.get("title") or w.get("name") or "Untitled"
-                    lines.append(f"• [{w.get('app', 'App')}] {title}")
+                    app_lbl = w.get("app_name") or w.get("app") or "App"
+                    lines.append(f"• [{app_lbl}] {title}")
                 return "\n".join(lines)
             return f"List windows failed: {res.get('error', {}).get('message')}"
 

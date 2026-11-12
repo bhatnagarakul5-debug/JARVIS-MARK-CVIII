@@ -1,4 +1,4 @@
-# 🛠️ J.A.R.V.I.S. Mark 58 — Troubleshooting & FAQ Guide
+# 🛠️ J.A.R.V.I.S. Mark 78 — Troubleshooting & FAQ Guide
 
 Welcome! If you encounter any issues downloading, installing, or running J.A.R.V.I.S., follow the quick solutions below.
 

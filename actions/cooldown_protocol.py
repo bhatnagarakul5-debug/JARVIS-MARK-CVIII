@@ -1,15 +1,14 @@
 """
-actions/cooldown_protocol.py — Stark CPU Thermal Cooldown & Power Saving Protocol
-Monitors CPU load & thermal spikes, automatically throttling non-essential background tasks
-and flushing memory caches to prevent overheating and system stalls.
+actions/cooldown_protocol.py — Stark CPU Thermal Cooldown, RAM Trimmer & Power Saving Protocol
+Monitors CPU load & thermal spikes, automatically throttling non-essential background tasks,
+dropping HUD framerate to 4 FPS Eco Mode, and trimming process working sets.
 """
 
 import gc
 import sys
-import time
+import ctypes
 import psutil
 import threading
-from pathlib import Path
 
 # Cooldown state
 _cooldown_active = False
@@ -27,19 +26,29 @@ def set_cooldown_mode(active: bool, player=None) -> str:
         _cooldown_active = active
 
     if active:
-        # Force garbage collection to free memory
         gc.collect()
-        if player and hasattr(player, "write_log"):
-            player.write_log("STARK PROTOCOL: Thermal Cooldown Active. Throttling non-essential tasks to conserve power.")
+        try:
+            if sys.platform == "win32":
+                ctypes.windll.kernel32.SetProcessWorkingSetSize(-1, -1, -1)
+        except Exception:
+            pass
+        if player:
+            if hasattr(player, "set_hud_fps"):
+                player.set_hud_fps(4)
+            if hasattr(player, "write_log"):
+                player.write_log("STARK PROTOCOL: Thermal Cooldown & Eco Mode Active. RAM trimmed, HUD set to 4 FPS.")
             if hasattr(player, "push_notification"):
-                player.push_notification("CPU Cooldown Active: Power Throttled", "warning")
-        return "CPU Cooldown Protocol ACTIVATED. Power consumption throttled and background tasks optimized."
+                player.push_notification("CPU Cooldown & Eco Mode Active", "warning")
+        return "CPU Cooldown & Eco Mode ACTIVATED. Working-set RAM trimmed and UI power consumption throttled."
     else:
-        if player and hasattr(player, "write_log"):
-            player.write_log("STARK PROTOCOL: Thermal Cooldown Deactivated. Full power restored.")
+        if player:
+            if hasattr(player, "set_hud_fps"):
+                player.set_hud_fps(10)
+            if hasattr(player, "write_log"):
+                player.write_log("STARK PROTOCOL: Thermal Cooldown Deactivated. Standard power restored.")
             if hasattr(player, "push_notification"):
-                player.push_notification("CPU Thermal Cooldown Deactivated: Full Power Restored", "success")
-        return "CPU Cooldown Protocol DEACTIVATED. Full system performance restored."
+                player.push_notification("CPU Thermal Cooldown Deactivated", "success")
+        return "CPU Cooldown Protocol DEACTIVATED. Normal system performance restored."
 
 
 def check_and_apply_cooldown(cpu_threshold: float = 85.0, player=None) -> dict:
@@ -65,24 +74,27 @@ def check_and_apply_cooldown(cpu_threshold: float = 85.0, player=None) -> dict:
 
 def cooldown_control(parameters: dict, player=None) -> str:
     """
-    Action handler for CPU Thermal Cooldown Protocol.
+    Action handler for CPU Thermal Cooldown & Eco Mode Protocol.
 
     parameters:
-        action    : status | activate | deactivate | check
+        action    : status | activate | deactivate | check | optimize_ram
         threshold : CPU load percentage threshold to trigger cooldown (default 85.0)
     """
     params = parameters or {}
     action = (params.get("action") or "status").lower().strip()
     threshold = float(params.get("threshold", 85.0))
 
-    if action in ("activate", "on", "engage"):
+    if action in ("activate", "on", "engage", "eco"):
         return set_cooldown_mode(True, player=player)
     elif action in ("deactivate", "off", "disengage"):
         return set_cooldown_mode(False, player=player)
+    elif action in ("optimize_ram", "trim_ram"):
+        from actions.system_diagnostics import optimize_system_ram
+        return optimize_system_ram(player=player)
     elif action in ("check", "scan"):
         res = check_and_apply_cooldown(cpu_threshold=threshold, player=player)
         status_str = "ACTIVE" if res["cooldown_active"] else "INACTIVE"
         return f"CPU Load: {res['cpu_percent']}% | RAM: {res['ram_percent']}% | Cooldown Status: {status_str}"
 
-    status_str = "ACTIVE (Power Throttled)" if is_cooldown_active() else "INACTIVE (Full Performance)"
+    status_str = "ACTIVE (Eco Power Throttled)" if is_cooldown_active() else "INACTIVE (Standard Eco)"
     return f"CPU Thermal Cooldown Protocol Status: {status_str}. Current CPU Load: {psutil.cpu_percent()}%."

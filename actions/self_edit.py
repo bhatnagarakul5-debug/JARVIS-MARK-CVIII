@@ -25,10 +25,25 @@ def _get_api_key() -> str:
         return json.load(f)["gemini_api_key"]
 
 
+_PROTECTED_FILES = {
+    "api_keys.json",
+    "jarvis_settings.json",
+    "integrity_baseline.json",
+    "server_security.py",
+    "security_audit.py",
+    "self_edit.py",
+}
+
+
 def _is_safe_path(path: Path) -> bool:
-    """Only allow editing files within the project directory."""
+    """Only allow editing non-sensitive files within the project directory."""
     try:
-        path.resolve().relative_to(PROJECT_DIR.resolve())
+        rel = path.resolve().relative_to(PROJECT_DIR.resolve())
+        rel_parts = {p.lower() for p in rel.parts}
+        if "memory" in rel_parts or ".git" in rel_parts or ".backups" in rel_parts:
+            return False
+        if path.name.lower() in _PROTECTED_FILES:
+            return False
         return True
     except ValueError:
         return False
@@ -50,6 +65,8 @@ def list_own_files() -> str:
     for ext in ["*.py", "*.txt", "*.json"]:
         for f in PROJECT_DIR.rglob(ext):
             if ".backups" in str(f) or "__pycache__" in str(f) or ".git" in str(f):
+                continue
+            if not _is_safe_path(f):
                 continue
             rel = f.relative_to(PROJECT_DIR)
             size = f.stat().st_size
@@ -90,9 +107,8 @@ def edit_own_file(file_path: str, description: str, speak=None) -> str:
         return f"Cannot edit {target.suffix} files for safety."
 
     try:
-        import google.generativeai as genai
-        genai.configure(api_key=_get_api_key())
-        model = genai.GenerativeModel("gemini-2.5-flash")
+        from google import genai
+        client = genai.Client(api_key=_get_api_key())
 
         original = target.read_text(encoding="utf-8")
 
@@ -110,16 +126,24 @@ def edit_own_file(file_path: str, description: str, speak=None) -> str:
             f"Return ONLY the code, no markdown backticks, no explanation."
         )
 
-        response = model.generate_content(prompt)
-        new_content = response.text.strip()
+        response = client.models.generate_content(
+            model="gemini-2.5-flash",
+            contents=prompt,
+        )
+        new_content = (response.text or "").strip()
         new_content = re.sub(r"```(?:python|json|txt)?", "", new_content).strip().rstrip("`").strip()
 
         if not new_content or len(new_content) < 20:
             return "Edit failed: Generated content was empty or too short."
 
-        # Basic safety check
-        if target.suffix == ".py" and "import" not in new_content and len(original) > 100:
-            return "Edit rejected: Generated code looks invalid (no imports found in a large file)."
+        # Basic safety & syntax check
+        if target.suffix == ".py":
+            if "import" not in new_content and len(original) > 100:
+                return "Edit rejected: Generated code looks invalid (no imports found in a large file)."
+            try:
+                compile(new_content, target.name, "exec")
+            except SyntaxError as syn_err:
+                return f"Edit rejected: Generated Python code contains a SyntaxError ({syn_err})."
 
         target.write_text(new_content, encoding="utf-8")
         return f"Successfully edited {target.name}. Backup saved at .backups/{backup.name}"

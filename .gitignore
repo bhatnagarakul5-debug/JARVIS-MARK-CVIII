@@ -1,5 +1,5 @@
 # =====================================================================
-# J.A.R.V.I.S. Mark XL — Security & Privacy Shield (.gitignore)
+# J.A.R.V.I.S. Mark 78 — Security & Privacy Shield (.gitignore)
 # Creator: Akul Bhatnagar (India, ESTD 2025)
 # ABSOLUTE PRIVACY GUARANTEE: BLOCKS ALL KEYS, MEMORIES, PASSWORDS & PHOTOS
 # =====================================================================
@@ -8,6 +8,9 @@
 config/api_keys.json
 config/jarvis_settings.json
 config/power_optimization.json
+config/voice_profile.npy
+config/saved_tabs.json
+config/last_active_document.json
 .env
 *.env
 
@@ -20,12 +23,20 @@ memory/conversations.jsonl
 memory/long_term.json
 memory/emotional_spectrum.json
 memory/active_conversation_thread.json
+memory/security_events.log
+memory/security_ledger.jsonl
+memory/document_qa_logs/
+memory/sovereign_state.json
 downloads/
 chroma_db/
 
 # 3. User Face Profile Photos & Uploaded Media
 config/known_faces/
 config/known_faces/*
+config/voice_samples/
+config/voice_samples/*
+memory/voice_samples/
+memory/voice_samples/*
 memory/security_snapshots/
 memory/security_snapshots/*
 scratch/
@@ -37,6 +48,9 @@ scratch/*
 _audit.py
 _test_*.py
 _list_*.py
+diagnostic.py
+diagnostic2.py
+test_sphinx.py
 generate_jarvis_logo.py
 
 # 5. OS & Python Caches
@@ -45,6 +59,7 @@ actions/__pycache__/
 core/__pycache__/
 memory/__pycache__/
 agent/__pycache__/
+.pytest_cache/
 *.pyc
 *.pyo
 *.pyd

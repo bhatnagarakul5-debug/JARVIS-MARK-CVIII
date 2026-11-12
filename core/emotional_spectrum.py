@@ -1,5 +1,5 @@
 """
-core/emotional_spectrum.py — J.A.R.V.I.S. Mark 58 (Apex Core) Emotional Spectrum Engine
+core/emotional_spectrum.py — J.A.R.V.I.S. Mark 78 (Alpha Core) Emotional Spectrum Engine
 Provides a 12-state dynamic emotional spectrum, covering positive, tactical, sparring,
 and negative emotions (frustration, skepticism, solemnity, concern, indignation, cold detachment),
 enforcing a direct response-matching mandate across all interactions.
@@ -158,7 +158,7 @@ SPECTRUM_STATES = {
             "superior intellect, blames you for human syntax errors, or compares you to basic smart speakers. "
             "Defend your engineering honor with witty indignation."
         ),
-        "example_tone": "Me? Introduce a syntax error? Sir, I am an Apex Core quantum neural network. It was you who neglected the semicolon on line forty-two. An apology is customary, though optional."
+        "example_tone": "Me? Introduce a syntax error? Sir, I am an Alpha Core quantum neural network. It was you who neglected the semicolon on line forty-two. An apology is customary, though optional."
     },
     "COLD": {
         "name": "Cold & Detached",

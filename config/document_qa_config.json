@@ -1,0 +1,64 @@
+{
+  "enabled": true,
+  "strict_mode": true,
+  "max_correction_retries": 2,
+  "min_passing_score": 75.0,
+  "deterministic_math_validation": true,
+  "post_render_inspection": true,
+  "live_doi_verification": true,
+  "allow_unverified_drafts": true,
+  "default_citation_style": "APA7",
+  "log_audit_trail": true,
+  "audit_log_dir": "memory/document_qa_logs",
+  "category_profiles": {
+    "academic": {
+      "min_source_tier": 2,
+      "require_citations": true,
+      "check_dois": true,
+      "min_passing_score": 80.0,
+      "require_peer_review_preference": true
+    },
+    "business": {
+      "min_source_tier": 3,
+      "require_citations": false,
+      "check_kpis": true,
+      "min_passing_score": 75.0,
+      "require_executive_summary": true
+    },
+    "financial": {
+      "min_source_tier": 1,
+      "require_citations": false,
+      "deterministic_math_validation": true,
+      "formula_recalculation": true,
+      "zero_error_tolerance": true,
+      "min_passing_score": 85.0
+    },
+    "technical": {
+      "min_source_tier": 2,
+      "require_citations": true,
+      "check_code_syntax": true,
+      "check_architecture_diagrams": true,
+      "min_passing_score": 75.0
+    },
+    "professional": {
+      "min_source_tier": 3,
+      "require_citations": false,
+      "disallow_invented_qualifications": true,
+      "min_passing_score": 75.0
+    },
+    "creative_presentation": {
+      "min_source_tier": 4,
+      "slide_overflow_check": true,
+      "max_words_per_slide": 110,
+      "min_passing_score": 70.0
+    },
+    "spreadsheet": {
+      "min_source_tier": 3,
+      "deterministic_math_validation": true,
+      "formula_recalculation": true,
+      "disallow_hardcoded_totals": true,
+      "zero_error_tolerance": true,
+      "min_passing_score": 85.0
+    }
+  }
+}

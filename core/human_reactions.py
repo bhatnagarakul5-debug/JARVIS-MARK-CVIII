@@ -1,5 +1,5 @@
 """
-core/human_reactions.py — Human Reactions & Gestures Engine for JARVIS Mark 58
+core/human_reactions.py — Human Reactions & Gestures Engine for JARVIS Mark 78
 Equips JARVIS with authentic human physiological & expressive micro-reactions:
 fake coughs, sneezes, throat clearings, yawns, dry chuckles, sighs, and eyebrow raises.
 Coordinates verbal phonetic cues with physical holographic gestures on the PyQt6 HUD.

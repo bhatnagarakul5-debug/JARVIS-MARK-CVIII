@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body {
+    width: 86px;
+    height: 86px;
+    background: transparent !important;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+  canvas {
+    width: 86px;
+    height: 86px;
+    border-radius: 50%;
+    display: block;
+    filter: drop-shadow(0 0 16px rgba(0, 225, 255, 0.45));
+  }
+</style>
+</head>
+<body>
+<canvas id="orbCanvas" width="172" height="172"></canvas>
+<script>
+  // ============================================================
+  // EXACT PROTOTYPE VOLUMETRIC RAYMARCHED GLSL FRAGMENT SHADER
+  // 100% evaluated in real time per-pixel on GPU shader ALUs
+  // ============================================================
+  const canvas = document.getElementById('orbCanvas');
+  const gl = canvas.getContext('webgl', { powerPreference: 'high-performance', alpha: true, premultipliedAlpha: false });
+
+  const vsSource = `
+    attribute vec2 position;
+    void main() {
+      gl_Position = vec4(position, 0.0, 1.0);
+    }
+  `;
+
+  const fsSource = `
+    precision highp float;
+    uniform float u_time;
+    uniform vec2 u_resolution;
+    uniform float u_mode; // 0.0=Idle, 1.0=Listening, 2.0=Thinking, 3.0=Speaking, 4.0=Muted, 5.0=War
+    uniform float u_pulse;
+
+    float hash(float n) { return fract(sin(n) * 43758.5453123); }
+    float noise(vec3 x) {
+      vec3 p = floor(x);
+      vec3 f = fract(x);
+      f = f * f * (3.0 - 2.0 * f);
+      float n = p.x + p.y * 57.0 + 113.0 * p.z;
+      return mix(mix(mix(hash(n+0.0), hash(n+1.0),f.x),
+                     mix(hash(n+57.0), hash(n+58.0),f.x),f.y),
+                 mix(mix(hash(n+113.0), hash(n+114.0),f.x),
+                     mix(hash(n+170.0), hash(n+171.0),f.x),f.y),f.z);
+    }
+
+    mat3 rotateY(float angle) {
+      float c = cos(angle);
+      float s = sin(angle);
+      return mat3(c, 0.0, s, 0.0, 1.0, 0.0, -s, 0.0, c);
+    }
+
+    mat3 rotateX(float angle) {
+      float c = cos(angle);
+      float s = sin(angle);
+      return mat3(1.0, 0.0, 0.0, 0.0, c, -s, 0.0, s, c);
+    }
+
+    void main() {
+      vec2 uv = (gl_FragCoord.xy - 0.5 * u_resolution.xy) / min(u_resolution.x, u_resolution.y);
+      float distCenter = length(uv);
+
+      vec3 ro = vec3(0.0, 0.0, 2.4);
+      vec3 rd = normalize(vec3(uv, -1.0));
+
+      float speedMult = (u_mode == 2.0) ? 3.5 : ((u_mode == 1.0 || u_mode == 3.0) ? 2.0 : 0.85);
+      float rotSpeed = u_time * 0.45 * speedMult;
+
+      ro = rotateY(rotSpeed) * rotateX(rotSpeed * 0.6) * ro;
+      rd = rotateY(rotSpeed) * rotateX(rotSpeed * 0.6) * rd;
+
+      float radius = 0.70 + sin(u_time * 2.5) * 0.02 * (1.0 + u_pulse * 0.5);
+      float glowAccum = 0.0;
+      float t = 0.0;
+
+      for(int i = 0; i < 28; i++) {
+        vec3 p = ro + rd * t;
+        float turbulence = noise(p * 2.8 + u_time * speedMult * 1.2) * 0.22;
+        float d = length(p) - radius + turbulence;
+        glowAccum += 0.016 / (abs(d) + 0.065);
+        if (d < 0.002 || t > 4.2) break;
+        t += d * 0.68;
+      }
+
+      vec3 cyanColor  = vec3(0.0, 0.88, 1.0);
+      vec3 deepCobalt = vec3(0.02, 0.22, 0.85);
+      vec3 coreWhite  = vec3(0.9, 0.98, 1.0);
+
+      if (u_mode == 5.0) { // War Mode
+        cyanColor  = vec3(1.0, 0.15, 0.25);
+        deepCobalt = vec3(0.5, 0.01, 0.05);
+      } else if (u_mode == 2.0) { // Thinking / Piloting
+        cyanColor  = vec3(0.75, 0.2, 1.0);
+        deepCobalt = vec3(0.25, 0.02, 0.7);
+      } else if (u_mode == 1.0 || u_mode == 3.0) { // Listening / Speaking
+        cyanColor  = vec3(0.0, 1.0, 0.65);
+      } else if (u_mode == 4.0) { // Muted
+        cyanColor  = vec3(1.0, 0.18, 0.35);
+        deepCobalt = vec3(0.4, 0.02, 0.08);
+      }
+
+      float rim = smoothstep(0.72, 0.38, distCenter);
+      vec3 color = mix(deepCobalt, cyanColor, glowAccum * 0.38) + coreWhite * pow(glowAccum * 0.14, 2.8);
+      color *= rim;
+
+      float alpha = clamp(glowAccum * 0.5 + (distCenter < 0.44 ? 0.95 : 0.0), 0.0, 1.0);
+      alpha *= smoothstep(0.50, 0.42, distCenter);
+
+      gl_FragColor = vec4(color, alpha);
+    }
+  `;
+
+  function buildShader(gl, type, src) {
+    const s = gl.createShader(type);
+    gl.shaderSource(s, src);
+    gl.compileShader(s);
+    return s;
+  }
+
+  const prog = gl.createProgram();
+  gl.attachShader(prog, buildShader(gl, gl.VERTEX_SHADER, vsSource));
+  gl.attachShader(prog, buildShader(gl, gl.FRAGMENT_SHADER, fsSource));
+  gl.linkProgram(prog);
+  gl.useProgram(prog);
+
+  const quad = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, quad);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([
+    -1, -1,  1, -1, -1,  1,
+    -1,  1,  1, -1,  1,  1
+  ]), gl.STATIC_DRAW);
+
+  const posAttr = gl.getAttribLocation(prog, 'position');
+  gl.enableVertexAttribArray(posAttr);
+  gl.vertexAttribPointer(posAttr, 2, gl.FLOAT, false, 0, 0);
+
+  const timeU = gl.getUniformLocation(prog, 'u_time');
+  const resU  = gl.getUniformLocation(prog, 'u_resolution');
+  const modeU = gl.getUniformLocation(prog, 'u_mode');
+  const pulsU = gl.getUniformLocation(prog, 'u_pulse');
+
+  gl.uniform2f(resU, canvas.width, canvas.height);
+
+  let currentMode = 1.0;
+  let pulseVal = 0.0;
+  const startT = performance.now();
+
+  function animLoop() {
+    const elapsed = (performance.now() - startT) * 0.001;
+    pulseVal = Math.max(0.0, pulseVal - 0.025);
+
+    gl.uniform1f(timeU, elapsed);
+    gl.uniform1f(modeU, currentMode);
+    gl.uniform1f(pulsU, pulseVal);
+    gl.drawArrays(gl.TRIANGLES, 0, 6);
+    requestAnimationFrame(animLoop);
+  }
+  requestAnimationFrame(animLoop);
+
+  window.setShaderMode = function(m) {
+    currentMode = Number(m);
+  };
+  window.triggerShaderPulse = function() {
+    pulseVal = 1.0;
+  };
+</script>
+</body>
+</html>

@@ -23,15 +23,19 @@ def optimize_hardware():
     except Exception as e:
         report.append(f"UI Macro Notice: {e}")
 
-    # 2. Windows Process Priority Boost
+    # 2. Hybrid P/E-Core Aware Process Priority (Intel Core i5-1334U)
     try:
         p = psutil.Process(os.getpid())
+        bat = psutil.sensors_battery()
+        on_battery = bool(bat and not bat.power_plugged)
         if sys.platform == "win32":
-            p.nice(psutil.ABOVE_NORMAL_PRIORITY_CLASS)
-            report.append("Process Priority: ABOVE_NORMAL_PRIORITY_CLASS (Windows)")
+            prio = psutil.BELOW_NORMAL_PRIORITY_CLASS if on_battery else psutil.NORMAL_PRIORITY_CLASS
+            p.nice(prio)
+            mode_lbl = "BELOW_NORMAL (E-Core Battery Eco)" if on_battery else "NORMAL (Hybrid Thread Director)"
+            report.append(f"Process Priority: {mode_lbl}")
         else:
-            p.nice(-5)
-            report.append("Process Priority: High (-5)")
+            p.nice(0)
+            report.append("Process Priority: Normal (0)")
     except Exception as e:
         report.append(f"Process Priority Notice: {e}")
 
@@ -44,15 +48,16 @@ def optimize_hardware():
     except Exception as e:
         report.append(f"OpenCV GPU Notice: {e}")
 
-    # 4. CPU Multi-Threading & Thread Contention Prevention
+    # 4. CPU Multi-Threading & Thread Contention Prevention (Cap at 4 threads for 2P+8E i5-1334U)
     try:
         cpu_count = os.cpu_count() or 4
-        os.environ["OMP_NUM_THREADS"] = str(max(1, cpu_count // 2))
-        os.environ["MKL_NUM_THREADS"] = str(max(1, cpu_count // 2))
-        os.environ["OPENBLAS_NUM_THREADS"] = str(max(1, cpu_count // 2))
-        os.environ["VECLIB_MAXIMUM_THREADS"] = str(max(1, cpu_count // 2))
-        os.environ["NUMEXPR_NUM_THREADS"] = str(max(1, cpu_count // 2))
-        report.append(f"CPU Thread Pool: Configured ({cpu_count} logical cores detected)")
+        capped_threads = str(min(4, max(1, cpu_count // 3)))
+        os.environ["OMP_NUM_THREADS"] = capped_threads
+        os.environ["MKL_NUM_THREADS"] = capped_threads
+        os.environ["OPENBLAS_NUM_THREADS"] = capped_threads
+        os.environ["VECLIB_MAXIMUM_THREADS"] = capped_threads
+        os.environ["NUMEXPR_NUM_THREADS"] = capped_threads
+        report.append(f"CPU Thread Pool: Capped at {capped_threads} threads ({cpu_count} logical cores detected)")
     except Exception as e:
         report.append(f"CPU Thread Notice: {e}")
 
@@ -90,7 +95,7 @@ def trim_process_memory() -> dict:
         try:
             import ctypes
             handle = ctypes.windll.kernel32.GetCurrentProcess()
-            # Flushes unused physical RAM pages to standby/page pool
+            ctypes.windll.kernel32.SetProcessWorkingSetSize(handle, ctypes.c_size_t(-1), ctypes.c_size_t(-1))
             ctypes.windll.psapi.EmptyWorkingSet(handle)
         except Exception:
             pass
@@ -119,7 +124,7 @@ def trim_process_memory() -> dict:
     }
 
 
-def start_memory_compactor(interval: float = 30.0, threshold_mb: float = 200.0, player=None):
+def start_memory_compactor(interval: float = 30.0, threshold_mb: float = 95.0, player=None):
     """
     Launches a lightweight background daemon thread that periodically flushes working set RAM
     whenever memory exceeds threshold_mb or system is idle.

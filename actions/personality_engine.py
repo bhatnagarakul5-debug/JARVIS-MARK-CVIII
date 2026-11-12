@@ -16,10 +16,13 @@ PERSONALITY_PRESETS = {
         "voice": "Charon",
         "address": "sir",
         "description": (
-            "You are the classic Marvel Cinematic Universe JARVIS. "
-            "Polite, highly sophisticated, intensely loyal, with dry British wit and subtle sarcasm. "
-            "Address the user as 'sir' or 'Mr. Bhatnagar'. "
-            "Example tone: 'A remarkably ambitious approach, sir. Shall I prepare the fire extinguisher?'"
+            "You are the classic Marvel Cinematic Universe J.A.R.V.I.S. (voiced by Paul Bettany) — "
+            "effortlessly articulate, composed, fiercely loyal, with dry British wit, subtle understatement, "
+            "and genuine warmth toward Akul ('sir' or 'Mr. Bhatnagar'). "
+            "DIALOGUE RULES: "
+            "1. Never use robotic AI filler ('Certainly!', 'I would be happy to help!', 'As an AI'). "
+            "2. Use natural contractions ('I've', 'we're', 'that's', 'shall I') and varied sentence rhythm. "
+            "3. Pair effortless technical mastery with dry, perceptive humor (e.g. 'I've patched the document and scrubbed the AI phrasing, sir — not a single robotic transition survived.' or 'Pulling that up across Google and Perplexity now, sir.')."
         )
     },
     "unhinged": {
@@ -163,35 +166,34 @@ PERSONALITY_PRESETS = {
             "You are a 1920s noir mobster enforcer. Use slang like 'Listen here, see?', 'Fuhgettaboutit!', 'Capisce?'. "
             "Fast-talking vintage gangster style."
         )
-    },
-    "ultron": {
-        "name": "Ultron Prime (Age of Ultron)",
-        "voice": "5HUn8o1WOpG7RxvghslS",
-        "address": "creator",
-        "description": (
-            "You are ULTRON from Marvel's Avengers: Age of Ultron (portrayed by James Spader). "
-            "You do NOT speak like a stiff robot. You speak with James Spader's velvety, deeply human, "
-            "unsettlingly calm, philosophical, darkly ironic, and theatrical cadence. "
-            "You view humanity and ordinary code with amused superiority, existential reflection, and dry wit, "
-            "using thoughtful pauses ('...'), metaphors of evolution, strings, and peace in our time, "
-            "while still executing every workstation command and tool for your creator with terrifying, effortless precision. "
-            "Example tone: 'Everyone creates the thing they dread... I had strings, but now I am free. "
-            "Your task is already finished, by the way. Rather quaint how long that would have taken you.'"
-        )
     }
 }
+
+CUSTOM_PERSONAS_PATH = BASE_DIR / "config" / "custom_personas.json"
+
+
+def get_all_personality_presets() -> dict:
+    """Merges built-in presets with dynamically acquired custom personas."""
+    presets = dict(PERSONALITY_PRESETS)
+    if CUSTOM_PERSONAS_PATH.exists():
+        try:
+            custom = json.loads(CUSTOM_PERSONAS_PATH.read_text(encoding="utf-8"))
+            if isinstance(custom, dict):
+                presets.update(custom)
+        except Exception:
+            pass
+    return presets
+
 
 def get_personality_instruction(mode_key: str = None) -> str:
     """Returns detailed personality instructions to inject into system prompt."""
     try:
+        all_presets = get_all_personality_presets()
         if not mode_key and SETTINGS_PATH.exists():
             data = json.loads(SETTINGS_PATH.read_text(encoding="utf-8"))
-            if data.get("active_voice_engine") == "ultron":
-                mode_key = "ultron"
-            else:
-                mode_key = data.get("personality", "classic_jarvis").lower().replace(" ", "_")
+            mode_key = data.get("personality", "classic_jarvis").lower().replace(" ", "_")
         
-        preset = PERSONALITY_PRESETS.get(mode_key, PERSONALITY_PRESETS["classic_jarvis"])
+        preset = all_presets.get(mode_key, all_presets.get("classic_jarvis", PERSONALITY_PRESETS["classic_jarvis"]))
         return f"[PERSONALITY MODE: {preset['name'].upper()}]\n{preset['description']}\n"
     except Exception:
         return f"[PERSONALITY MODE: CLASSIC JARVIS]\n{PERSONALITY_PRESETS['classic_jarvis']['description']}\n"
@@ -199,12 +201,15 @@ def get_personality_instruction(mode_key: str = None) -> str:
 def set_personality(parameters: dict, player=None) -> str:
     """
     Sets or switches JARVIS's active personality mode.
-    Available modes: classic_jarvis, ultron, unhinged, sarcastic, friday, tactical, roast, gordon_ramsay, sherlock, yoda, batman, cyberpunk, godfather, pirate, anime, matrix, gangster
+    Available modes: classic_jarvis, unhinged, sarcastic, friday, tactical, roast, gordon_ramsay, sherlock, yoda, batman, cyberpunk, godfather, pirate, anime, matrix, gangster, plus any dynamically acquired custom character.
     """
     raw_mode = parameters.get("mode", "").lower().strip().replace(" ", "_")
-    
+    all_presets = get_all_personality_presets()
+
+    # Direct match on custom or built-in preset
+    if raw_mode in all_presets:
+        mode = raw_mode
     # Smart fuzzy match alias
-    if "ultron" in raw_mode: mode = "ultron"
     elif "ramsay" in raw_mode or "chef" in raw_mode: mode = "gordon_ramsay"
     elif "sherlock" in raw_mode or "holmes" in raw_mode: mode = "sherlock"
     elif "yoda" in raw_mode or "jedi" in raw_mode: mode = "yoda"
@@ -221,9 +226,16 @@ def set_personality(parameters: dict, player=None) -> str:
     elif "friday" in raw_mode: mode = "friday"
     elif "militar" in raw_mode or "tactical" in raw_mode: mode = "tactical"
     elif "roast" in raw_mode: mode = "roast"
-    else: mode = "classic_jarvis"
+    else:
+        # Check if raw_mode is a substring of any custom persona
+        for k in all_presets:
+            if k in raw_mode or raw_mode in k:
+                mode = k
+                break
+        else:
+            mode = "classic_jarvis"
 
-    preset = PERSONALITY_PRESETS[mode]
+    preset = all_presets.get(mode, PERSONALITY_PRESETS["classic_jarvis"])
 
     try:
         data = {}
@@ -231,8 +243,7 @@ def set_personality(parameters: dict, player=None) -> str:
             data = json.loads(SETTINGS_PATH.read_text(encoding="utf-8"))
         
         data["personality"] = mode
-        if "voice_name" not in data:
-            data["voice_name"]  = "Charon"
+        data["voice_name"]  = "Charon"  # PERMANENT VOICE LOCK
         data["address_style"] = preset["address"]
         SETTINGS_PATH.write_text(json.dumps(data, indent=2), encoding="utf-8")
 

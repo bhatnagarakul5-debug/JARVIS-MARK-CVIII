@@ -139,13 +139,42 @@ def recognize_face_from_bytes(img_bytes: bytes) -> str:
 
 def camera_control(parameters: dict, player=None) -> str:
     """
-    Action handler for face profile memory query.
+    Action handler for taking camera snaps/pictures with AI commentary and face profile memory.
     """
+    params = parameters or {}
+    action = (params.get("action") or params.get("mode") or "snap").lower().strip()
+    prompt = (params.get("prompt") or params.get("text") or params.get("question") or "").strip()
+    person_name = (params.get("name") or params.get("person_name") or "").strip()
+
+    if action in ("snap", "picture", "photo", "take_picture", "take_snap", "comment", "analyze", "capture") or not person_name:
+        if action not in ("list", "list_faces", "faces"):
+            from actions.screen_processor import screen_process
+            return screen_process(
+                {"angle": "camera", "text": prompt or "Take a picture from the camera and make a comment on what you see."},
+                player=player,
+            )
+
+    if action in ("save", "remember", "save_face") and person_name:
+        try:
+            from actions.screen_processor import capture_camera_photo
+            img_bytes, _ = capture_camera_photo(save_to_disk=True)
+            return save_face_profile(person_name, img_bytes)
+        except Exception as e:
+            return f"Could not capture photo to save face profile: {e}"
+
+    if action in ("recognize", "identify", "who_is_this"):
+        try:
+            from actions.screen_processor import capture_camera_photo
+            img_bytes, _ = capture_camera_photo(save_to_disk=False)
+            return recognize_face_from_bytes(img_bytes)
+        except Exception as e:
+            return f"Could not capture photo for face recognition: {e}"
+
     faces = list_remembered_faces()
     if faces:
         names = ", ".join(faces)
-        return f"Remembered Face Profiles in Memory: {names}. (Upload photos to @AKULJARVIS_BOT on Telegram to add or identify faces!)."
-    return "No face profiles currently stored. Upload a photo with a name caption to @AKULJARVIS_BOT on Telegram to save a face profile!"
+        return f"Remembered Face Profiles in Memory: {names}."
+    return "No face profiles currently stored."
 
 
 class CameraManager:

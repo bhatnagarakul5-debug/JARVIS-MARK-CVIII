@@ -81,11 +81,17 @@ def create_project_workspace(parameters: dict, player=None) -> str:
             readme_md.write_text(f"# {project_name}\n\nWorkspace created by JARVIS.\n", encoding="utf-8")
             created_files.append("README.md")
 
-        # Try launching VS Code in target dir
+        # Try launching VS Code in target dir safely (shell=False)
         vscode_opened = False
         try:
-            subprocess.Popen(["code", str(target_dir)], shell=True)
-            vscode_opened = True
+            import shutil
+            code_bin = (
+                shutil.which("code")
+                or rf"C:\Users\{Path.home().name}\AppData\Local\Programs\Microsoft VS Code\Code.exe"
+            )
+            if code_bin and (code_bin == "code" or Path(code_bin).exists()):
+                subprocess.Popen([code_bin, str(target_dir)], shell=False)
+                vscode_opened = True
         except Exception:
             pass
 

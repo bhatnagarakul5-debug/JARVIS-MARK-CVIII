@@ -1,6 +1,6 @@
 """
 actions/anti_shoulder_surfer.py — Sentry Vision Privacy Shield & Anti-Shoulder Surfer Engine
-For J.A.R.V.I.S. Mark 58
+For J.A.R.V.I.S. Mark 78
 
 Protects screen privacy in public spaces (college libraries, cafes, offices):
 1. Background Vision Sentry: Periodically audits webcam frames (every 3.5s).

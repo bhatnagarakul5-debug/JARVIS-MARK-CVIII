@@ -247,11 +247,20 @@ def _clear_field() -> str:
     return "Field cleared"
 
 def _focus_window(title: str) -> str:
+    try:
+        from actions.agent_desktop import get_agent_desktop
+        res = get_agent_desktop().focus_window(title)
+        if res.get("ok"):
+            return f"Focused window: {title}"
+    except Exception:
+        pass
+
     os_name = _get_os()
 
     if os_name == "windows":
         try:
-            script = f'(New-Object -ComObject WScript.Shell).AppActivate("{title}")'
+            safe_title = title.replace('"', "").replace("'", "").replace("`", "").replace("$", "")
+            script = f'(New-Object -ComObject WScript.Shell).AppActivate("{safe_title}")'
             subprocess.run(
                 ["powershell", "-NoProfile", "-NonInteractive", "-Command", script],
                 capture_output=True, timeout=5,
@@ -308,7 +317,7 @@ def _screen_find(description: str, app: str | None = None) -> dict | None:
         res = ad.find(description, app=app)
         if res.get("ok"):
             data = res.get("data", {})
-            elements = data.get("elements", []) if isinstance(data, dict) else (data if isinstance(data, list) else [])
+            elements = data.get("matches", data.get("elements", [])) if isinstance(data, dict) else (data if isinstance(data, list) else [])
             if elements:
                 return elements[0]
     except Exception as e:
@@ -429,7 +438,7 @@ def computer_control(
         if action == "screen_find":
             el = _screen_find(params.get("description", ""), app=params.get("app"))
             if el:
-                ref = el.get("ref", "")
+                ref = el.get("ref_id") or el.get("ref", "")
                 role = el.get("role", "")
                 name = el.get("name", "")
                 return f"FOUND: ref={ref}, role={role}, name={name}"
@@ -439,8 +448,8 @@ def computer_control(
             desc = params.get("description", "")
             app  = params.get("app")
             el   = _screen_find(desc, app=app)
-            if el and el.get("ref"):
-                ref = el["ref"]
+            ref  = (el.get("ref_id") or el.get("ref", "")) if el else ""
+            if ref:
                 from actions.agent_desktop import get_agent_desktop
                 ad = get_agent_desktop()
                 res = ad.click(ref, headed=params.get("headed", False))

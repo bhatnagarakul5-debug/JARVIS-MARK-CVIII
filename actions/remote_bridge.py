@@ -565,8 +565,9 @@ class TelegramRemoteBridge:
         elif cmd_low.startswith("/launch ") or cmd_low.startswith("launch "):
             app_name = cmd.split(" ", 1)[1].strip()
             try:
-                os.system(f"start {app_name}")
-                self._send_reply(chat_id, f"🚀 Launched application: '{app_name}'")
+                from actions.open_app import open_app
+                res = open_app({"app_name": app_name}, player=self.player)
+                self._send_reply(chat_id, f"🚀 {res}")
                 _audit_log(f"Launched app: '{app_name}'")
             except Exception as e:
                 self._send_reply(chat_id, f"Could not launch '{app_name}': {e}")
@@ -575,16 +576,21 @@ class TelegramRemoteBridge:
         elif cmd_low.startswith("/kill ") or cmd_low.startswith("kill "):
             proc_name = cmd.split(" ", 1)[1].strip()
             try:
-                os.system(f"taskkill /f /im {proc_name}.exe")
-                self._send_reply(chat_id, f"🛑 Terminated process: '{proc_name}'")
-                _audit_log(f"Killed process: '{proc_name}'")
+                import re
+                safe_proc = re.sub(r"[^a-zA-Z0-9_\-]", "", proc_name.replace(".exe", ""))
+                if not safe_proc:
+                    self._send_reply(chat_id, "Invalid process name.")
+                else:
+                    subprocess.run(["taskkill", "/F", "/IM", f"{safe_proc}.exe"], shell=False, capture_output=True, timeout=6)
+                    self._send_reply(chat_id, f"🛑 Terminated process: '{safe_proc}.exe'")
+                    _audit_log(f"Killed process: '{safe_proc}.exe'")
             except Exception as e:
                 self._send_reply(chat_id, f"Could not kill '{proc_name}': {e}")
 
         # 🌐 Web Search (/search <query>)
         elif cmd_low.startswith("/search ") or cmd_low.startswith("search "):
             query = cmd.split(" ", 1)[1].strip()
-            from actions.web_search import web_search_action
+            from actions.web_search import web_search as web_search_action
             res = web_search_action({"query": query}, player=self.player)
             self._send_reply(chat_id, f"🌐 Search Results for '{query}':\n\n{res[:1000]}")
 
@@ -638,28 +644,28 @@ class TelegramRemoteBridge:
         # 🔊 Volume Control (/vol <0-100>, /mute, /unmute)
         elif cmd_low.startswith("/vol ") or cmd_low.startswith("vol "):
             vol_val = cmd.split(" ", 1)[1].strip()
-            from actions.computer_control import set_master_volume
-            res = set_master_volume(vol_val, player=self.player)
+            from actions.computer_settings import computer_settings
+            res = computer_settings({"action": "volume_set", "value": vol_val}, player=self.player)
             self._send_reply(chat_id, f"🔊 {res}")
 
         elif cmd_low in ("/mute", "mute"):
-            from actions.computer_control import toggle_mute
-            res = toggle_mute(True, player=self.player)
+            from actions.computer_settings import computer_settings
+            res = computer_settings({"action": "mute"}, player=self.player)
             self._send_reply(chat_id, f"🔇 {res}")
 
         elif cmd_low in ("/unmute", "unmute"):
-            from actions.computer_control import toggle_mute
-            res = toggle_mute(False, player=self.player)
+            from actions.computer_settings import computer_settings
+            res = computer_settings({"action": "unmute"}, player=self.player)
             self._send_reply(chat_id, f"🔊 {res}")
 
         # 🔋 Power Control (/sleep, /hibernate)
         elif cmd_low in ("/sleep", "sleep"):
             self._send_reply(chat_id, "😴 Putting laptop to sleep...")
-            os.system("rundll32.exe powrprof.dll,SetSuspendState 0,1,0")
+            subprocess.run(["rundll32.exe", "powrprof.dll,SetSuspendState", "0,1,0"], shell=False)
 
         elif cmd_low in ("/hibernate", "hibernate"):
             self._send_reply(chat_id, "💤 Hibernating laptop...")
-            os.system("shutdown /h")
+            subprocess.run(["shutdown", "/h"], shell=False)
 
         # 📝 Clipboard Control (/clip, /clip <text>)
         elif cmd_low.startswith("/clip") or cmd_low.startswith("clip"):
@@ -677,9 +683,13 @@ class TelegramRemoteBridge:
         # 📄 Document & PDF Reader (/read <filepath>)
         elif cmd_low.startswith("/read ") or cmd_low.startswith("read "):
             doc_path = cmd.split(" ", 1)[1].strip()
-            from actions.file_processor import process_file
-            res = process_file({"file_path": doc_path, "query": "Summarize this document in bullet points"}, player=self.player)
-            self._send_reply(chat_id, f"📄 Document Summary:\n\n{res[:1200]}")
+            is_safe, canonical_p, reason = validate_safe_file_access(doc_path)
+            if not is_safe or not canonical_p:
+                self._send_reply(chat_id, f"🛡️ SECURITY SHIELD: {reason}")
+            else:
+                from actions.file_processor import file_processor
+                res = file_processor({"file_path": str(canonical_p), "action": "summarize"}, player=self.player)
+                self._send_reply(chat_id, f"📄 Document Summary:\n\n{res[:1200]}")
 
         # 🎵 Spotify Music Control (/play <song>, /pause, /next)
         elif cmd_low.startswith("/play ") or cmd_low.startswith("play "):

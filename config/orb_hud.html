@@ -1,0 +1,620 @@
+<!DOCTYPE html>
+<html lang="en" style="background: transparent;">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>J.A.R.V.I.S. Holographic Orb</title>
+<style>
+  :root {
+    --jarvis-cyan: #00e1ff;
+    --jarvis-glow: rgba(0, 225, 255, 0.4);
+    --jarvis-core: #0077ff;
+    --glass-bg: rgba(5, 9, 16, 0.62);
+    --glass-border: rgba(0, 225, 255, 0.18);
+    --text-main: #e8f7ff;
+    --text-muted: #7395b8;
+  }
+
+  * {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+
+  html, body {
+    background: transparent !important;
+    height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    padding-left: 8px;
+    overflow: hidden;
+  }
+
+  /* Master Container */
+  .orb-system-container {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    contain: layout style paint;
+    transform: translate3d(0, 0, 0);
+  }
+
+  /* 3D Pure Volumetric Shader Orb Capsule (No distracting outer rings or boxes) */
+  .orb-pod {
+    position: relative;
+    width: 86px;
+    height: 86px;
+    border-radius: 50%;
+    cursor: grab;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform 0.24s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    filter: drop-shadow(0 0 18px rgba(0, 225, 255, 0.42));
+  }
+
+  .orb-pod:active {
+    cursor: grabbing;
+    transform: scale(0.95);
+  }
+
+  .orb-pod:hover {
+    transform: scale(1.05);
+    filter: drop-shadow(0 0 24px rgba(0, 225, 255, 0.6));
+  }
+
+  /* WebGL Shader Canvas - Pure Living 3D Plasma */
+  canvas#orbCanvas {
+    width: 86px;
+    height: 86px;
+    border-radius: 50%;
+    display: block;
+  }
+
+  /* Ultra-Sleek Glassmorphic Taskbar Drawer */
+  .satellite-panel {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    height: 38px;
+    padding: 3px 12px 3px 10px;
+    background: var(--glass-bg);
+    backdrop-filter: blur(36px) saturate(210%);
+    -webkit-backdrop-filter: blur(36px) saturate(210%);
+    border: 1px solid var(--glass-border);
+    border-radius: 19px;
+    box-shadow: 
+      0 12px 32px -4px rgba(0, 0, 0, 0.65),
+      0 0 16px -2px rgba(0, 225, 255, 0.16),
+      inset 0 1px 1px rgba(255, 255, 255, 0.12);
+    
+    transform-origin: left center;
+    transition: all 0.32s cubic-bezier(0.16, 1, 0.3, 1);
+    max-width: 670px;
+    opacity: 1;
+  }
+
+  .satellite-panel.retracted {
+    max-width: 0px;
+    opacity: 0;
+    padding: 0;
+    margin: 0;
+    overflow: hidden;
+    border-color: transparent;
+    pointer-events: none;
+  }
+
+  /* Identity & Status Telemetry */
+  .telemetry-meta {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    min-width: 84px;
+    flex-shrink: 0;
+  }
+
+  .meta-title {
+    font-size: 9.5px;
+    font-weight: 800;
+    letter-spacing: 2px;
+    color: var(--jarvis-cyan);
+    text-shadow: 0 0 8px var(--jarvis-glow);
+  }
+
+  .status-row {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    margin-top: 1px;
+  }
+
+  .status-dot {
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: #10b981;
+    box-shadow: 0 0 6px #10b981;
+    transition: background 0.3s ease, box-shadow 0.3s ease;
+  }
+
+  .meta-state {
+    font-size: 8px;
+    font-weight: 600;
+    letter-spacing: 0.9px;
+    color: var(--text-muted);
+  }
+
+  /* Subtle Hairline Divider */
+  .v-divider {
+    width: 1px;
+    height: 16px;
+    background: rgba(255, 255, 255, 0.08);
+    flex-shrink: 0;
+  }
+
+  /* Sleek Command Input Field */
+  .cmd-slot {
+    display: flex;
+    align-items: center;
+    background: rgba(0, 0, 0, 0.35);
+    border: 1px solid rgba(0, 225, 255, 0.14);
+    border-radius: 13px;
+    height: 27px;
+    padding: 0 10px;
+    min-width: 240px;
+    transition: all 0.22s ease;
+  }
+
+  .cmd-slot:focus-within {
+    border-color: rgba(0, 225, 255, 0.5);
+    box-shadow: 0 0 10px rgba(0, 225, 255, 0.3);
+    background: rgba(0, 0, 0, 0.5);
+  }
+
+  .cmd-slot input {
+    width: 100%;
+    background: transparent;
+    border: none;
+    outline: none;
+    color: var(--text-main);
+    font-size: 11px;
+    letter-spacing: 0.2px;
+    user-select: text;
+    -webkit-user-select: text;
+  }
+
+  .cmd-slot input::placeholder {
+    color: rgba(115, 149, 184, 0.65);
+    font-size: 10.5px;
+  }
+
+  /* Sleek Action Buttons */
+  .pill-action {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    color: var(--text-muted);
+    height: 25px;
+    padding: 0 8px;
+    border-radius: 7px;
+    cursor: pointer;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.3px;
+    transition: all 0.2s ease;
+    flex-shrink: 0;
+  }
+
+  .pill-action:hover {
+    background: rgba(0, 225, 255, 0.14);
+    border-color: rgba(0, 225, 255, 0.38);
+    color: #fff;
+    box-shadow: 0 0 10px rgba(0, 225, 255, 0.25);
+  }
+
+  .pill-action svg {
+    width: 11px;
+    height: 11px;
+    stroke: currentColor;
+    stroke-width: 2;
+    fill: none;
+  }
+
+  /* Window Controls */
+  .control-cluster {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex-shrink: 0;
+  }
+
+  .ctrl-icon {
+    width: 21px;
+    height: 21px;
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    color: var(--text-muted);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  .ctrl-icon:hover {
+    background: rgba(255, 255, 255, 0.15);
+    color: #fff;
+  }
+
+  .ctrl-icon.close-btn:hover {
+    background: rgba(255, 45, 85, 0.85);
+    border-color: #ff2d55;
+    color: #fff;
+    box-shadow: 0 0 10px rgba(255, 45, 85, 0.45);
+  }
+
+  .ctrl-icon svg {
+    width: 10px;
+    height: 10px;
+    stroke: currentColor;
+    stroke-width: 2.2;
+    fill: none;
+  }
+
+  .file-badge {
+    color: #10b981;
+    font-size: 10px;
+    font-weight: 700;
+    max-width: 100px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    display: none;
+  }
+</style>
+</head>
+<body>
+
+<div class="orb-system-container" id="orbRoot">
+  <!-- Pure 3D Living Volumetric Holographic Orb (No Clutter, Clean Floating Sphere) -->
+  <div class="orb-pod" id="orbClicker" title="Click to toggle controls, Drag to move">
+    <canvas id="orbCanvas" width="172" height="172"></canvas>
+  </div>
+
+  <!-- Sleek Satellite Glass Taskbar -->
+  <div class="satellite-panel" id="satelliteBar">
+    <div class="telemetry-meta">
+      <span class="meta-title">J.A.R.V.I.S.</span>
+      <div class="status-row">
+        <span class="status-dot" id="statusDot"></span>
+        <span class="meta-state" id="orbStateLabel">READY</span>
+      </div>
+    </div>
+
+    <div class="v-divider"></div>
+
+    <span class="file-badge" id="fileBadge"></span>
+
+    <div class="cmd-slot" id="dropTarget">
+      <input type="text" id="orbInput" placeholder="Ask J.A.R.V.I.S., message apps, or type command... [Enter]" autocomplete="off">
+    </div>
+
+    <!-- Attach File Button -->
+    <button class="pill-action" id="btnAttach" title="Attach file for analysis">
+      <svg viewBox="0 0 24 24"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+      <span>Attach</span>
+    </button>
+
+    <!-- Snap Button -->
+    <button class="pill-action" id="btnSnap" title="Capture screen/camera snapshot">
+      <svg viewBox="0 0 24 24"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>
+      <span>Snap</span>
+    </button>
+
+    <!-- Mic Toggle Button -->
+    <button class="pill-action" id="btnMic" title="Toggle microphone [F4]">
+      <svg viewBox="0 0 24 24"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="23"></line><line x1="8" y1="23" x2="16" y2="23"></line></svg>
+      <span id="micLabel">Mic</span>
+    </button>
+
+    <!-- Switch to Blade Mode -->
+    <button class="pill-action" id="btnBlade" title="Switch to Tactical Stealth Blade">
+      <span>Blade</span>
+    </button>
+
+    <div class="v-divider"></div>
+
+    <div class="control-cluster">
+      <!-- Retract to pure Orb -->
+      <button class="ctrl-icon" id="retractBtn" title="Retract to pure Orb">
+        <svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg>
+      </button>
+      <!-- Close Overlay -->
+      <button class="ctrl-icon close-btn" id="dismissBtn" title="Close J.A.R.V.I.S.">
+        <svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+      </button>
+    </div>
+  </div>
+</div>
+
+<script>
+  // ============================================================
+  // EXACT VOLUMETRIC RAYMARCHED GLSL FRAGMENT SHADER
+  // 100% of 3D geometry, noise turbulence, lighting & Fresnel rim
+  // is evaluated in real time per-pixel on GPU shader ALUs.
+  // ============================================================
+  const canvas = document.getElementById('orbCanvas');
+  const gl = canvas.getContext('webgl', { powerPreference: 'high-performance', alpha: true });
+
+  const vsSource = `
+    attribute vec2 position;
+    void main() {
+      gl_Position = vec4(position, 0.0, 1.0);
+    }
+  `;
+
+  const fsSource = `
+    precision highp float;
+    uniform float u_time;
+    uniform vec2 u_resolution;
+    uniform float u_mode; // 0.0 = Idle, 1.0 = Listening, 2.0 = Thinking, 3.0 = Speaking, 4.0 = Muted
+    uniform float u_pulse;
+
+    float hash(float n) { return fract(sin(n) * 43758.5453123); }
+    float noise(vec3 x) {
+      vec3 p = floor(x);
+      vec3 f = fract(x);
+      f = f * f * (3.0 - 2.0 * f);
+      float n = p.x + p.y * 57.0 + 113.0 * p.z;
+      return mix(mix(mix(hash(n+0.0), hash(n+1.0),f.x),
+                     mix(hash(n+57.0), hash(n+58.0),f.x),f.y),
+                 mix(mix(hash(n+113.0), hash(n+114.0),f.x),
+                     mix(hash(n+170.0), hash(n+171.0),f.x),f.y),f.z);
+    }
+
+    mat3 rotateY(float angle) {
+      float c = cos(angle);
+      float s = sin(angle);
+      return mat3(c, 0.0, s, 0.0, 1.0, 0.0, -s, 0.0, c);
+    }
+
+    mat3 rotateX(float angle) {
+      float c = cos(angle);
+      float s = sin(angle);
+      return mat3(1.0, 0.0, 0.0, 0.0, c, -s, 0.0, s, c);
+    }
+
+    void main() {
+      vec2 uv = (gl_FragCoord.xy - 0.5 * u_resolution.xy) / min(u_resolution.x, u_resolution.y);
+      float distCenter = length(uv);
+
+      vec3 ro = vec3(0.0, 0.0, 2.4);
+      vec3 rd = normalize(vec3(uv, -1.0));
+
+      float speedMult = (u_mode == 2.0) ? 3.5 : ((u_mode == 1.0 || u_mode == 3.0) ? 2.0 : 0.85);
+      float rotSpeed = u_time * 0.45 * speedMult;
+
+      ro = rotateY(rotSpeed) * rotateX(rotSpeed * 0.6) * ro;
+      rd = rotateY(rotSpeed) * rotateX(rotSpeed * 0.6) * rd;
+
+      float radius = 0.70 + sin(u_time * 2.5) * 0.02 * (1.0 + u_pulse * 0.5);
+      float glowAccum = 0.0;
+      float t = 0.0;
+
+      for(int i = 0; i < 28; i++) {
+        vec3 p = ro + rd * t;
+        float turbulence = noise(p * 2.8 + u_time * speedMult * 1.2) * 0.22;
+        float d = length(p) - radius + turbulence;
+        glowAccum += 0.016 / (abs(d) + 0.065);
+        if (d < 0.002 || t > 4.2) break;
+        t += d * 0.68;
+      }
+
+      vec3 cyanColor  = vec3(0.0, 0.88, 1.0);
+      vec3 deepCobalt = vec3(0.02, 0.22, 0.85);
+      vec3 coreWhite  = vec3(0.9, 0.98, 1.0);
+
+      if (u_mode == 2.0) {
+        cyanColor = vec3(0.75, 0.2, 1.0);
+        deepCobalt = vec3(0.25, 0.02, 0.7);
+      } else if (u_mode == 1.0 || u_mode == 3.0) {
+        cyanColor = vec3(0.0, 1.0, 0.65);
+      } else if (u_mode == 4.0) {
+        cyanColor = vec3(1.0, 0.18, 0.35);
+        deepCobalt = vec3(0.4, 0.02, 0.08);
+      }
+
+      float rim = smoothstep(0.72, 0.38, distCenter);
+      vec3 color = mix(deepCobalt, cyanColor, glowAccum * 0.38) + coreWhite * pow(glowAccum * 0.14, 2.8);
+      color *= rim;
+
+      float alpha = clamp(glowAccum * 0.5 + (distCenter < 0.44 ? 0.95 : 0.0), 0.0, 1.0);
+      alpha *= smoothstep(0.50, 0.42, distCenter);
+
+      gl_FragColor = vec4(color, alpha);
+    }
+  `;
+
+  function buildShader(gl, type, src) {
+    const s = gl.createShader(type);
+    gl.shaderSource(s, src);
+    gl.compileShader(s);
+    return s;
+  }
+
+  const prog = gl.createProgram();
+  gl.attachShader(prog, buildShader(gl, gl.VERTEX_SHADER, vsSource));
+  gl.attachShader(prog, buildShader(gl, gl.FRAGMENT_SHADER, fsSource));
+  gl.linkProgram(prog);
+  gl.useProgram(prog);
+
+  const quad = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, quad);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([
+    -1, -1,  1, -1, -1,  1,
+    -1,  1,  1, -1,  1,  1
+  ]), gl.STATIC_DRAW);
+
+  const posAttr = gl.getAttribLocation(prog, 'position');
+  gl.enableVertexAttribArray(posAttr);
+  gl.vertexAttribPointer(posAttr, 2, gl.FLOAT, false, 0, 0);
+
+  const timeU = gl.getUniformLocation(prog, 'u_time');
+  const resU  = gl.getUniformLocation(prog, 'u_resolution');
+  const modeU = gl.getUniformLocation(prog, 'u_mode');
+  const pulsU = gl.getUniformLocation(prog, 'u_pulse');
+
+  gl.uniform2f(resU, canvas.width, canvas.height);
+
+  let currentMode = 0.0;
+  let pulseVal = 0.0;
+  const startT = performance.now();
+
+  function animLoop() {
+    const elapsed = (performance.now() - startT) * 0.001;
+    pulseVal = Math.max(0.0, pulseVal - 0.025);
+
+    gl.uniform1f(timeU, elapsed);
+    gl.uniform1f(modeU, currentMode);
+    gl.uniform1f(pulsU, pulseVal);
+    gl.drawArrays(gl.TRIANGLES, 0, 6);
+    requestAnimationFrame(animLoop);
+  }
+  requestAnimationFrame(animLoop);
+
+  // Python Navigation Bridge Helper
+  function sendToPython(action, params = {}) {
+    let url = 'jarvis://' + action;
+    const keys = Object.keys(params);
+    if (keys.length > 0) {
+      url += '?' + keys.map(k => encodeURIComponent(k) + '=' + encodeURIComponent(params[k])).join('&');
+    }
+    window.location.href = url;
+  }
+
+  // Toggle Satellite Drawer on Orb Click
+  const orbClicker = document.getElementById('orbClicker');
+  const satelliteBar = document.getElementById('satelliteBar');
+  orbClicker.addEventListener('click', (e) => {
+    if (!isDragging) {
+      pulseVal = 1.0;
+      satelliteBar.classList.toggle('retracted');
+      if (!satelliteBar.classList.contains('retracted')) {
+        document.getElementById('orbInput').focus();
+      }
+    }
+  });
+
+  // Retract Button
+  document.getElementById('retractBtn').addEventListener('click', () => {
+    satelliteBar.classList.add('retracted');
+  });
+
+  // Buttons
+  document.getElementById('btnAttach').addEventListener('click', () => sendToPython('browse_file'));
+  document.getElementById('btnSnap').addEventListener('click', () => sendToPython('snap'));
+  document.getElementById('btnMic').addEventListener('click', () => sendToPython('toggle_mic'));
+  document.getElementById('btnBlade').addEventListener('click', () => sendToPython('switch_mode', { mode: 'blade' }));
+  document.getElementById('dismissBtn').addEventListener('click', () => sendToPython('close'));
+
+  // Submit on Enter
+  const cmdInp = document.getElementById('orbInput');
+  cmdInp.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      const txt = cmdInp.value.trim();
+      if (!txt) return;
+      pulseVal = 1.0;
+      setOrbState('THINKING');
+      cmdInp.value = '';
+      sendToPython('cmd', { text: txt });
+    }
+  });
+
+  // Drag Window Logic via Orb
+  let isDragging = false;
+  let dragStartX = 0, dragStartY = 0;
+
+  orbClicker.addEventListener('mousedown', (e) => {
+    isDragging = false;
+    dragStartX = e.screenX;
+    dragStartY = e.screenY;
+    
+    function onMouseMove(moveEvent) {
+      const dx = moveEvent.screenX - dragStartX;
+      const dy = moveEvent.screenY - dragStartY;
+      if (Math.abs(dx) > 3 || Math.abs(dy) > 3) {
+        isDragging = true;
+        dragStartX = moveEvent.screenX;
+        dragStartY = moveEvent.screenY;
+        sendToPython('drag_move', { dx: dx, dy: dy });
+      }
+    }
+
+    function onMouseUp() {
+      window.removeEventListener('mousemove', onMouseMove);
+      window.removeEventListener('mouseup', onMouseUp);
+    }
+
+    window.addEventListener('mousemove', onMouseMove);
+    window.addEventListener('mouseup', onMouseUp);
+  });
+
+  // External APIs called by Python
+  window.setOrbState = function(state) {
+    const st = (state || 'LISTENING').toUpperCase();
+    const lbl = document.getElementById('orbStateLabel');
+    const dot = document.getElementById('statusDot');
+    if (st === 'THINKING' || st === 'WORKING' || st === 'PILOTING') {
+      currentMode = 2.0;
+      lbl.innerText = 'PROCESSING';
+      dot.style.background = '#c026d3';
+      dot.style.boxShadow = '0 0 6px #c026d3';
+    } else if (st === 'SPEAKING') {
+      currentMode = 3.0;
+      lbl.innerText = 'SPEAKING';
+      dot.style.background = '#10b981';
+      dot.style.boxShadow = '0 0 6px #10b981';
+    } else if (st === 'MUTED') {
+      currentMode = 4.0;
+      lbl.innerText = 'MUTED';
+      dot.style.background = '#f43f5e';
+      dot.style.boxShadow = '0 0 6px #f43f5e';
+    } else {
+      currentMode = 1.0;
+      lbl.innerText = 'ONLINE';
+      dot.style.background = '#00e1ff';
+      dot.style.boxShadow = '0 0 6px #00e1ff';
+    }
+  };
+
+  window.setAttachedFile = function(fileName) {
+    const badge = document.getElementById('fileBadge');
+    if (fileName) {
+      badge.innerText = '[' + fileName + ']';
+      badge.style.display = 'inline-block';
+    } else {
+      badge.innerText = '';
+      badge.style.display = 'none';
+    }
+  };
+
+  window.setMicLabel = function(lbl) {
+    document.getElementById('micLabel').innerText = lbl;
+  };
+
+  window.pulseOrb = function() {
+    pulseVal = 1.0;
+  };
+</script>
+
+</body>
+</html>

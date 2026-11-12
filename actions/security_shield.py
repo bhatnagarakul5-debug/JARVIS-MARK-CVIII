@@ -36,27 +36,14 @@ def _send_sentry_alert_sync(msg: str, player=None) -> bool:
             bot_token = cfg.get("telegram_bot_token", "")
             chat_id = cfg.get("telegram_chat_id", "")
 
-        if bot_token:
-            if not chat_id:
-                try:
-                    upd_resp = requests.get(f"https://api.telegram.org/bot{bot_token}/getUpdates", timeout=3).json()
-                    for update in upd_resp.get("result", []):
-                        msg_obj = update.get("message") or update.get("edited_message") or update.get("channel_post") or {}
-                        c_id = msg_obj.get("chat", {}).get("id")
-                        if c_id:
-                            chat_id = str(c_id)
-                            break
-                except Exception:
-                    pass
-
-            if chat_id:
-                url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
-                resp = requests.post(url, json={"chat_id": chat_id, "text": f"🚨 {msg}"}, timeout=4)
-                if resp.status_code == 200:
-                    telegram_sent = True
-            else:
-                if player and hasattr(player, "write_log"):
-                    player.write_log("SECURITY NOTICE: Please text @AKULJARVIS_BOT once on Telegram to save your Chat ID for phone alerts!")
+        if bot_token and chat_id:
+            url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
+            resp = requests.post(url, json={"chat_id": chat_id, "text": f"🚨 {msg}"}, timeout=4)
+            if resp.status_code == 200:
+                telegram_sent = True
+        else:
+            if player and hasattr(player, "write_log"):
+                player.write_log("SECURITY NOTICE: Configure telegram_bot_token and telegram_chat_id in config/api_keys.json for phone alerts.")
     except Exception as e:
         if player and hasattr(player, "write_log"):
             player.write_log(f"SECURITY: Telegram alert notice: {e}")
@@ -70,7 +57,7 @@ def _send_sentry_alert_sync(msg: str, player=None) -> bool:
             with open(cfg_path, "r", encoding="utf-8") as f:
                 target_contact = json.load(f).get("whatsapp_target_contact", "Akul")
 
-        send_message({"recipient": target_contact, "message": f"🚨 {msg}"}, player=player)
+        send_message({"receiver": target_contact, "message_text": f"🚨 {msg}", "platform": "whatsapp"}, player=player)
         whatsapp_sent = True
     except Exception:
         pass
@@ -191,7 +178,7 @@ def scan_local_network(player=None) -> str:
 
     devices = []
     try:
-        output = subprocess.check_output("arp -a", shell=True, text=True, timeout=5)
+        output = subprocess.check_output(["arp", "-a"], shell=False, text=True, timeout=5)
         lines = output.splitlines()
         for line in lines:
             if "dynamic" in line.lower() or "static" in line.lower():

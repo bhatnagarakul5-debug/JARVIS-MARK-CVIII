@@ -1,18 +1,27 @@
-import asyncio
-import base64
+"""
+actions/screen_processor.py — Instant Camera Snap, Live Screen Observer & Visual Action Engine (Mark 78)
+Capabilities:
+1. Webcam Snap ('camera'): Captures high-clarity photo when user says 'take a snap' or 'take a picture',
+   saves to Pictures/JARVIS_Snaps/, and returns witty, observant human-like commentary.
+2. Live Screen Observation ('screen'): Captures the display + active window title when told to 'see the screen',
+   'observe the screen', or 'what is on my screen', and analyzes documents, PPTs, videos, or code on screen.
+3. Screen Observation + Direct Action (act=True or action intent): When told to 'see the screen and fix/edit/change/type...',
+   analyzes the visual screen and automatically acts on it (edits the open Word/PPT/code file, or types/pastes the
+   revised content directly into the active window, or clicks the target UI control).
+"""
+
 import io
-import json
 import re
+import json
 import os
 import sys
 import time
-import threading
+from datetime import datetime
+from pathlib import Path
+
 import cv2
 import mss
 import mss.tools
-import sounddevice as sd
-import numpy as np
-from pathlib import Path
 
 try:
     import PIL.Image
@@ -23,32 +32,27 @@ except ImportError:
 from google import genai
 from google.genai import types
 
-def get_base_dir():
+
+def get_base_dir() -> Path:
     if getattr(sys, "frozen", False):
         return Path(sys.executable).parent
     return Path(__file__).resolve().parent.parent
 
-BASE_DIR        = get_base_dir()
+
+BASE_DIR = get_base_dir()
 API_CONFIG_PATH = BASE_DIR / "config" / "api_keys.json"
 
-LIVE_MODEL          = "models/gemini-2.5-flash-native-audio-preview-12-2025"
-CHANNELS            = 1
-RECEIVE_SAMPLE_RATE = 24000
-CHUNK_SIZE          = 1024
+IMG_MAX_W = 1366
+IMG_MAX_H = 900
+JPEG_Q = 82
 
-IMG_MAX_W = 640
-IMG_MAX_H = 360
-JPEG_Q    = 55
 
-SYSTEM_PROMPT = (
-    "You are JARVIS from Iron Man movies. "
-    "Analyze images with technical precision and intelligence. "
-    "Help the user in a way they can understand — don't be overly complex. "
-    "Be concise, smart, and helpful like Tony Stark's AI assistant. "
-    "Respond in maximum 2 short sentences. Speed is priority. "
-    "Address the user as 'sir' for a tone of respect. "
-    "Ask if the user needs any further help with their problem."
-)
+def _get_snaps_dir() -> Path:
+    pics = Path.home() / "OneDrive" / "Pictures" / "JARVIS_Snaps"
+    if not pics.parent.exists():
+        pics = Path.home() / "Pictures" / "JARVIS_Snaps"
+    pics.mkdir(parents=True, exist_ok=True)
+    return pics
 
 
 def _get_api_key() -> str:
@@ -63,6 +67,17 @@ def _get_api_key() -> str:
         raise RuntimeError(f"Could not load API key: {e}")
 
 
+def _get_active_window_title() -> str:
+    try:
+        import pygetwindow as gw
+        win = gw.getActiveWindow()
+        if win and win.title:
+            return win.title.strip()
+    except Exception:
+        pass
+    return "Desktop"
+
+
 def _get_camera_index() -> int:
     try:
         with open(API_CONFIG_PATH, "r", encoding="utf-8") as f:
@@ -72,10 +87,8 @@ def _get_camera_index() -> int:
     except Exception:
         pass
 
-    print("[Camera] 🔍 No camera index in config. Auto-detecting...")
     best_index = 0
-
-    for idx in range(6):
+    for idx in range(4):
         cap = cv2.VideoCapture(idx, cv2.CAP_DSHOW)
         if not cap.isOpened():
             cap.release()
@@ -86,10 +99,7 @@ def _get_camera_index() -> int:
         cap.release()
         if ret and frame is not None and frame.mean() > 5:
             best_index = idx
-            print(f"[Camera] ✅ Camera found at index {idx} — saving to config.")
             break
-        else:
-            print(f"[Camera] ⚠️  Index {idx}: no valid frame.")
 
     try:
         cfg = {}
@@ -99,9 +109,8 @@ def _get_camera_index() -> int:
         cfg["camera_index"] = best_index
         with open(API_CONFIG_PATH, "w", encoding="utf-8") as f:
             json.dump(cfg, f, indent=4)
-        print(f"[Camera] 💾 Camera index {best_index} saved to config.")
-    except Exception as e:
-        print(f"[Camera] ⚠️  Could not save camera index: {e}")
+    except Exception:
+        pass
 
     return best_index
 
@@ -110,258 +119,276 @@ def _to_jpeg(img_bytes: bytes) -> bytes:
     if not _PIL_OK:
         return img_bytes
     img = PIL.Image.open(io.BytesIO(img_bytes)).convert("RGB")
-    img.thumbnail([IMG_MAX_W, IMG_MAX_H], PIL.Image.BILINEAR)
+    img.thumbnail([IMG_MAX_W, IMG_MAX_H], PIL.Image.Resampling.BILINEAR)
     buf = io.BytesIO()
-    img.save(buf, format="JPEG", quality=JPEG_Q, optimize=False)
+    img.save(buf, format="JPEG", quality=JPEG_Q, optimize=True)
     return buf.getvalue()
 
 
-def _capture_screenshot() -> bytes:
+def capture_screenshot(save_to_disk: bool = True) -> tuple[bytes, Path | None]:
     with mss.mss() as sct:
-        shot      = sct.grab(sct.monitors[1])
+        shot = sct.grab(sct.monitors[1])
         png_bytes = mss.tools.to_png(shot.rgb, shot.size)
-    return _to_jpeg(png_bytes)
+    jpg_bytes = _to_jpeg(png_bytes)
+    saved_path = None
+    if save_to_disk:
+        ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+        saved_path = _get_snaps_dir() / f"screen_snap_{ts}.jpg"
+        saved_path.write_bytes(jpg_bytes)
+    return jpg_bytes, saved_path
 
 
-def _capture_camera() -> bytes:
+def capture_camera_photo(save_to_disk: bool = True) -> tuple[bytes, Path | None]:
     camera_index = _get_camera_index()
     cap = cv2.VideoCapture(camera_index, cv2.CAP_DSHOW)
     if not cap.isOpened():
-        raise RuntimeError(f"Camera could not be opened: index {camera_index}")
-    for _ in range(10):
-        cap.read()
-    ret, frame = cap.read()
+        cap = cv2.VideoCapture(camera_index)
+    if not cap.isOpened():
+        raise RuntimeError(f"Camera could not be opened (index {camera_index})")
+
+    frame = None
+    ret = False
+    for _ in range(12):
+        ret, frame = cap.read()
     cap.release()
+
     if not ret or frame is None:
-        raise RuntimeError("Could not capture camera frame.")
+        raise RuntimeError("Could not capture frame from webcam.")
+
+    saved_path = None
+    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+    if save_to_disk:
+        saved_path = _get_snaps_dir() / f"camera_snap_{ts}.jpg"
+        cv2.imwrite(str(saved_path), frame, [cv2.IMWRITE_JPEG_QUALITY, 92])
+
     if _PIL_OK:
         rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         img = PIL.Image.fromarray(rgb)
-        img.thumbnail([IMG_MAX_W, IMG_MAX_H], PIL.Image.BILINEAR)
+        img.thumbnail([IMG_MAX_W, IMG_MAX_H], PIL.Image.Resampling.BILINEAR)
         buf = io.BytesIO()
-        img.save(buf, format="JPEG", quality=JPEG_Q, optimize=False)
-        return buf.getvalue()
+        img.save(buf, format="JPEG", quality=JPEG_Q, optimize=True)
+        return buf.getvalue(), saved_path
+
     _, buf = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, JPEG_Q])
-    return buf.tobytes()
+    return buf.tobytes(), saved_path
 
 
-class _LiveSession:
+def _execute_screen_action(action_spec: dict, active_title: str) -> str:
+    """Executes an autonomous action derived from observing the screen."""
+    act_type = (action_spec.get("action_type") or "none").lower().strip()
+    if act_type == "none":
+        return ""
 
-    def __init__(self):
-        self._loop:      asyncio.AbstractEventLoop | None = None
-        self._thread:    threading.Thread | None          = None
-        self._session                                     = None
-        self._out_queue: asyncio.Queue | None             = None
-        self._audio_in:  asyncio.Queue | None             = None
-        self._ready:     threading.Event                  = threading.Event()
-        self._player                                      = None
-        self._send_lock: asyncio.Lock | None              = None
+    try:
+        # 1. Edit open file on disk if filename is known or detected in window title
+        if act_type == "edit_file":
+            fname = action_spec.get("file_name") or ""
+            if not fname and " - " in active_title:
+                fname = active_title.split(" - ")[0].strip()
+            instr = action_spec.get("edit_instruction") or action_spec.get("text_to_type") or ""
+            if fname and instr:
+                from actions.file_controller import edit_any_file
+                return edit_any_file(path=fname, instruction=instr, open_after=True)
 
-    def start(self, player=None):
-        if self._thread and self._thread.is_alive():
-            return
-        self._player = player
-        self._thread = threading.Thread(
-            target=self._run_loop, daemon=True, name="VisionSessionThread"
+        # 2. Type or paste generated/corrected text directly into the active window on screen
+        if act_type in ("type_text", "paste_text", "write"):
+            txt = (action_spec.get("text_to_type") or "").strip()
+            if txt:
+                from core.humanizer import scrub_ai_watermarks
+                clean_txt = scrub_ai_watermarks(txt)
+                import pyperclip
+                import pyautogui
+                pyperclip.copy(clean_txt)
+                time.sleep(0.15)
+                pyautogui.hotkey("ctrl", "v")
+                return f"Pasted humanized text ({len(clean_txt.split())} words) directly into '{active_title}'."
+
+        # 3. Click a UI element on screen via UI Automation
+        if act_type == "click_element":
+            target_el = (action_spec.get("target_element") or "").strip()
+            if target_el:
+                from actions.agent_desktop import agent_desktop_control
+                return agent_desktop_control({"action": "click", "target": target_el})
+    except Exception as e:
+        return f"Screen action notice: {e}"
+    return ""
+
+
+def analyze_image_with_commentary(
+    image_bytes: bytes,
+    user_prompt: str,
+    source_type: str = "camera",
+    saved_path: Path | None = None,
+    act_on_screen: bool = False,
+) -> str:
+    """
+    Uses Gemini 2.5 Flash Vision to inspect the captured picture/screen, deliver sharp, witty,
+    natural commentary, and optionally execute direct edits/actions on what is visible on screen.
+    """
+    client = genai.Client(api_key=_get_api_key())
+    active_title = _get_active_window_title() if source_type == "screen" else "Webcam"
+
+    p_low = (user_prompt or "").lower()
+    wants_action = act_on_screen or (
+        source_type == "screen"
+        and any(
+            kw in p_low
+            for kw in (
+                "fix", "edit", "rewrite", "change", "type", "write", "solve",
+                "answer", "fill", "click", "update", "add to", "act on",
+            )
         )
-        self._thread.start()
-        ok = self._ready.wait(timeout=20)
-        if not ok:
-            raise RuntimeError("Vision session did not start within 20s.")
-        print("[ScreenProcess] ✅ Vision session ready (no mic)")
+    )
 
-    def _run_loop(self):
-        self._loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(self._loop)
-        self._loop.run_until_complete(self._main())
-
-    async def _main(self):
-        self._out_queue = asyncio.Queue(maxsize=30)
-        self._audio_in  = asyncio.Queue()
-        self._send_lock = asyncio.Lock()
-
-        client = genai.Client(
-            api_key=_get_api_key(),
-            http_options={"api_version": "v1beta"}
+    if wants_action:
+        prompt = (
+            f"You are JARVIS observing Akul's live laptop screen.\n"
+            f"Active Window Title: '{active_title}'\n"
+            f"User Command: {user_prompt}\n\n"
+            "Analyze the screen and return a JSON object with:\n"
+            "{\n"
+            '  "commentary": "2-sentence sharp, natural spoken summary of what you see and what change you are making",\n'
+            '  "action_type": "paste_text" | "edit_file" | "click_element" | "none",\n'
+            '  "text_to_type": "If user wants you to write/fix/solve/reply on screen, put the complete humanized text/solution here",\n'
+            '  "file_name": "If editing an open file visible in the titlebar, put its filename here",\n'
+            '  "edit_instruction": "Instruction for modifying the file",\n'
+            '  "target_element": "Button or UI control name if clicking"\n'
+            "}"
         )
-
-        config = types.LiveConnectConfig(
-            response_modalities=["AUDIO"],
-            output_audio_transcription={},
-            system_instruction=SYSTEM_PROMPT,
-            speech_config=types.SpeechConfig(
-                voice_config=types.VoiceConfig(
-                    prebuilt_voice_config=types.PrebuiltVoiceConfig(
-                        voice_name="Charon"
-                    )
-                )
-            ),
+        resp = client.models.generate_content(
+            model="gemini-2.5-flash",
+            contents=[
+                types.Part.from_bytes(data=image_bytes, mime_type="image/jpeg"),
+                prompt,
+            ],
         )
-
-        while True:
+        raw = (resp.text or "").strip() if resp else ""
+        m = re.search(r"\{.*\}", raw, re.DOTALL)
+        if m:
             try:
-                print("[ScreenProcess] 🔌 Vision session connecting...")
-                async with client.aio.live.connect(model=LIVE_MODEL, config=config) as session:
-                    self._session = session
-                    self._ready.set()
-                    print("[ScreenProcess] ✅ Vision session connected")
-                    async with asyncio.TaskGroup() as tg:
-                        tg.create_task(self._send_loop())
-                        tg.create_task(self._recv_loop())
-                        tg.create_task(self._play_loop())
-            except Exception as e:
-                print(f"[ScreenProcess] ⚠️ Disconnected: {e} — reconnecting...")
-                self._session = None
-                self._ready.clear()
-                await asyncio.sleep(2)
-                self._ready.set()
+                spec = json.loads(m.group(0))
+                comment = spec.get("commentary", "Observed your screen and executed the update, sir.")
+                act_res = _execute_screen_action(spec, active_title)
+                if act_res:
+                    return f"{comment} [{act_res}]"
+                return comment
+            except Exception:
+                pass
 
-    async def _send_loop(self):
-        while True:
-            item = await self._out_queue.get()
-            if self._session:
-                image_bytes, mime_type, user_text = item
-                try:
-                    b64 = base64.b64encode(image_bytes).decode("utf-8")
-                    await self._session.send_client_content(
-                        turns={
-                            "parts": [
-                                {"inline_data": {"mime_type": mime_type, "data": b64}},
-                                {"text": user_text}
-                            ]
-                        },
-                        turn_complete=True
-                    )
-                    print("[ScreenProcess] ✅ Image sent")
-                except Exception as e:
-                    print(f"[ScreenProcess] ⚠️ Send error: {e}")
+    prompt = (
+        f"You are JARVIS, Akul's sharp, witty, perceptive AI partner.\n"
+        f"Source captured: {source_type.upper()} "
+        f"({'Webcam photo of Akul/surroundings' if source_type == 'camera' else f'Live laptop screen — Active window: {active_title}'}).\n"
+        f"User's request: {user_prompt or 'Look at this and give me your observation.'}\n\n"
+        f"Instructions:\n"
+        f"1. Observe the exact visual details (if webcam: expression, posture, objects, lighting; if screen: open document, slides, video timeline, code, or data).\n"
+        f"2. Speak naturally with dry British wit, warmth, and crisp clarity — no robotic lists or clichés.\n"
+        f"3. Keep it to 2–3 sentences unless the user asked for a deep breakdown."
+    )
 
-    async def _recv_loop(self):
-        transcript_buf: list[str] = []
-        try:
-            async for response in self._session.receive():
-                if response.data:
-                    await self._audio_in.put(response.data)
-                sc = response.server_content
-                if not sc:
-                    continue
-                if sc.output_transcription and sc.output_transcription.text:
-                    chunk = sc.output_transcription.text.strip()
-                    if chunk:
-                        transcript_buf.append(chunk)
-                if sc.turn_complete:
-                    if transcript_buf and self._player:
-                        full = re.sub(r'\s+', ' ', " ".join(transcript_buf)).strip()
-                        if full:
-                            self._player.write_log(f"Jarvis: {full}")
-                            print(f"[ScreenProcess] 💬 {full}")
-                    transcript_buf = []
-        except Exception as e:
-            print(f"[ScreenProcess] ⚠️ Recv error: {e}")
-            transcript_buf = []
-            await asyncio.sleep(0.3)
-
-    async def _play_loop(self):
-        stream = sd.RawOutputStream(
-            samplerate=RECEIVE_SAMPLE_RATE,
-            channels=CHANNELS,
-            dtype="int16",
-            blocksize=CHUNK_SIZE,
-        )
-        stream.start()
-        try:
-            while True:
-                chunk = await self._audio_in.get()
-                await asyncio.to_thread(stream.write, chunk)
-        except Exception as e:
-            print(f"[ScreenProcess] ❌ Play error: {e}")
-            raise
-        finally:
-            stream.stop()
-            stream.close()
-
-    def analyze(self, image_bytes: bytes, mime_type: str, user_text: str):
-        if not self._loop:
-            return
-        asyncio.run_coroutine_threadsafe(
-            self._out_queue.put((image_bytes, mime_type, user_text)),
-            self._loop
-        )
-
-    def is_ready(self) -> bool:
-        return self._session is not None
-
-
-_live       = _LiveSession()
-_started    = False
-_start_lock = threading.Lock()
-
-
-def _ensure_started(player=None):
-    global _started
-    with _start_lock:
-        if not _started:
-            _live.start(player=player)
-            _started = True
-        elif player is not None:
-            _live._player = player
+    resp = client.models.generate_content(
+        model="gemini-2.5-flash",
+        contents=[
+            types.Part.from_bytes(data=image_bytes, mime_type="image/jpeg"),
+            prompt,
+        ],
+    )
+    comment = (resp.text or "").strip() if resp else "Captured and analyzed, sir."
+    if saved_path:
+        return f"{comment} (Saved to {saved_path.name})"
+    return comment
 
 
 def screen_process(
-    parameters:     dict,
-    response:       str | None = None,
+    parameters: dict,
+    response: str | None = None,
     player=None,
     session_memory=None,
-) -> bool:
-    user_text = (parameters or {}).get("text") or (parameters or {}).get("user_text", "")
-    user_text = (user_text or "").strip()
-    if not user_text:
-        print("[ScreenProcess] ⚠️ No user_text provided.")
-        return False
+    live_session=None,
+    live_loop=None,
+) -> str:
+    params = parameters or {}
+    user_text = (
+        params.get("text")
+        or params.get("user_text")
+        or params.get("prompt")
+        or "Observe this and tell me what you see"
+    ).strip()
+    raw_angle = (params.get("angle") or "").lower().strip()
+    act_flag = bool(params.get("act", False) or params.get("act_on_screen", False))
 
-    angle = (parameters or {}).get("angle", "screen").lower().strip()
-    print(f"[ScreenProcess] angle={angle!r}  text={user_text!r}")
+    t_low = user_text.lower()
+    camera_keywords = (
+        "picture", "photo", "selfie", "camera", "webcam",
+        "look at me", "holding", "wearing", "my face", "take a snap",
+    )
+    screen_keywords = (
+        "screen", "screenshot", "window", "display", "monitor",
+        "desktop", "code", "document", "slide", "ppt", "video",
+    )
 
-    _ensure_started(player=player)
+    if raw_angle == "camera":
+        use_camera = True
+    elif raw_angle == "screen" and not any(k in t_low for k in ("picture", "photo", "selfie", "camera", "webcam", "look at me")):
+        if "take a snap" in t_low and not any(sk in t_low for sk in screen_keywords):
+            use_camera = True
+        else:
+            use_camera = False
+    elif any(k in t_low for k in camera_keywords) and not any(sk in t_low for sk in screen_keywords):
+        use_camera = True
+    else:
+        use_camera = False
+
+    if player and hasattr(player, "write_log"):
+        player.write_log(f"VISION // {'CAMERA SNAP' if use_camera else 'SCREEN OBSERVATION'}...")
+
+    saved_path = None
+    source_used = "camera" if use_camera else "screen"
+    try:
+        if use_camera:
+            try:
+                image_bytes, saved_path = capture_camera_photo(save_to_disk=True)
+            except Exception as cam_err:
+                print(f"[Vision] Camera unavailable ({cam_err}), falling back to screen capture.")
+                image_bytes, saved_path = capture_screenshot(save_to_disk=True)
+                source_used = "screen"
+        else:
+            image_bytes, saved_path = capture_screenshot(save_to_disk=True)
+    except Exception as e:
+        err_msg = f"Could not capture visual feed, sir: {e}"
+        if player and hasattr(player, "write_log"):
+            player.write_log(f"ERR: {err_msg}")
+        return err_msg
+
+    # Stream frame into active Gemini Live session so JARVIS maintains continuous visual memory
+    if live_session is not None and live_loop is not None:
+        try:
+            import asyncio
+            asyncio.run_coroutine_threadsafe(
+                live_session.send_realtime_input(
+                    media={"data": image_bytes, "mime_type": "image/jpeg"}
+                ),
+                live_loop,
+            )
+        except Exception:
+            pass
 
     try:
-        if angle == "camera":
-            image_bytes = _capture_camera()
-            mime_type   = "image/jpeg"
-            print("[ScreenProcess] 📷 Camera captured")
-        else:
-            image_bytes = _capture_screenshot()
-            mime_type   = "image/jpeg" if _PIL_OK else "image/png"
-            print("[ScreenProcess] 🖥️ Screen captured")
+        commentary = analyze_image_with_commentary(
+            image_bytes=image_bytes,
+            user_prompt=user_text,
+            source_type=source_used,
+            saved_path=saved_path,
+            act_on_screen=act_flag,
+        )
+        if player and hasattr(player, "write_log"):
+            player.write_log(f"VISION // {commentary[:90]}")
+        return commentary
     except Exception as e:
-        import traceback; traceback.print_exc()
-        print(f"[ScreenProcess] ❌ Capture error: {e}")
-        return False
-
-    print(f"[ScreenProcess] 📦 {len(image_bytes)} bytes → sending")
-    _live.analyze(image_bytes, mime_type, user_text)
-    return True
+        if saved_path:
+            return f"Captured to {saved_path}, sir, though analysis encountered an error: {e}"
+        return f"Visual analysis error: {e}"
 
 
 def warmup_session(player=None):
-    try:
-        _ensure_started(player=player)
-    except Exception as e:
-        print(f"[ScreenProcess] ⚠️ Warmup error: {e}")
-
-
-if __name__ == "__main__":
-    print("[TEST] screen_processor.py v8 — image-only session")
-    print("=" * 50)
-    mode    = input("screen / camera (default: screen): ").strip().lower() or "screen"
-    request = input("Question (Enter for default): ").strip() or "What do you see? Be brief."
-
-    t0 = time.perf_counter()
-    warmup_session()
-    print(f"Session ready — {time.perf_counter()-t0:.2f}s\n")
-
-    t1     = time.perf_counter()
-    result = screen_process({"angle": mode, "text": request}, player=None)
-    print(f"Sent — {time.perf_counter()-t1:.3f}s | audio incoming...")
-    time.sleep(8)
-    print(f"\n{'✅' if result else '❌'}")
+    pass

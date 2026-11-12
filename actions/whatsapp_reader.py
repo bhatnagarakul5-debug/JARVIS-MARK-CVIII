@@ -66,16 +66,19 @@ def _focus_whatsapp() -> bool:
 
 
 def _search_whatsapp_contact(contact: str) -> bool:
-    """Helper to search for a contact in WhatsApp."""
+    """Helper to search for a contact in WhatsApp using instant clipboard paste."""
     pyautogui.hotkey("ctrl", "f")
-    time.sleep(0.3)
+    time.sleep(0.25)
     pyautogui.hotkey("ctrl", "a")
     pyautogui.press("backspace")
-    time.sleep(0.2)
-    pyautogui.write(contact, interval=0.03)
-    time.sleep(0.8)
+    time.sleep(0.1)
+    pyperclip.copy(contact)
+    pyautogui.hotkey("ctrl", "v")
+    time.sleep(0.75)
+    pyautogui.press("down")
+    time.sleep(0.15)
     pyautogui.press("enter")
-    time.sleep(0.6)
+    time.sleep(0.55)
     return True
 
 

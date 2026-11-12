@@ -2,6 +2,8 @@ import json
 import re
 import sys
 from pathlib import Path
+from google import genai
+from google.genai import types
 
 
 def get_base_dir() -> Path:
@@ -14,15 +16,15 @@ BASE_DIR        = get_base_dir()
 API_CONFIG_PATH = BASE_DIR / "config" / "api_keys.json"
 
 
-PLANNER_PROMPT = """You are the planning module of MARK XXV, a personal AI assistant.
+PLANNER_PROMPT = """You are the planning module of J.A.R.V.I.S. Mark 78 (Alpha Core).
 Your job: break any user goal into a sequence of steps using ONLY the tools listed below.
 
 ABSOLUTE RULES:
-- NEVER use generated_code or write Python scripts. It does not exist.
-- NEVER reference previous step results in parameters. Every step is independent.
-- Use web_search for ANY information retrieval, research, or current data.
-- Use file_controller to save content to disk.
-- Use cmd_control to open files or run system commands.
+- NEVER invent tools not listed below.
+- Use web_search or deep_research for information retrieval or research.
+- Use file_generator for creating Word (.docx), PDF (.pdf), Excel (.xlsx), or Markdown documents.
+- Use presentation_designer or exam_companion for creating PowerPoint (.pptx) presentations or study materials.
+- Use agent_desktop or computer_control for UI interactions.
 - Max 5 steps. Use the minimum steps needed.
 
 AVAILABLE TOOLS AND THEIR PARAMETERS:
@@ -31,17 +33,47 @@ open_app
   app_name: string (required)
 
 web_search
-  query: string (required) — write a clear, focused search query
+  query: string (required) — clear, focused search query
   mode: "search" or "compare" (optional, default: search)
   items: list of strings (optional, for compare mode)
   aspect: string (optional, for compare mode)
 
-game_updater
-  action: "update" | "install" | "list" | "download_status" | "schedule" (required)
-  platform: "steam" | "epic" | "both" (optional, default: both)
-  game_name: string (optional)
-  app_id: string (optional)
-  shutdown_when_done: boolean (optional)
+deep_research
+  topic: string (required)
+  depth: "quick" | "standard" | "deep" (optional)
+
+file_generator
+  file_name: string (required, e.g. "Study_Notes.docx" or "Report.pdf")
+  title: string (required)
+  content: string (optional — auto-generated if omitted)
+  topic: string (optional)
+
+presentation_designer
+  action: "create" | "from_document" | "edit" (required)
+  topic: string (required for create)
+  theme: "stark_dark" | "executive_light" | "academic_study" | "emerald_growth" | "royal_velvet" | "crimson_impact" | "minimal_slate" (optional)
+  slide_count: int (optional, default: 7)
+
+exam_companion
+  action: "cheat_sheet" | "predict_questions" | "flashcards" | "viva" | "create_study_ppt" | "create_study_doc" (required)
+  subject: string (required)
+  file_path: string (optional)
+
+daily_briefing
+  export_to: "docx" | "pdf" | "md" (optional)
+
+system_diagnostics
+  action: "full" | "optimize" | "optimize_ram" | "top_processes" | "eco_mode" (optional)
+
+spotify_control
+  action: "play" | "pause" | "next" | "previous" | "current" | "volume" (required)
+  query: string (optional)
+
+agent_desktop
+  action: "snapshot" | "find" | "click" | "type" | "press" | "focus_window" | "launch" | "list_apps" | "list_windows" (required)
+  target: string (optional)
+  app: string (optional)
+  text: string (optional)
 
 browser_control
   action: "go_to" | "search" | "click" | "type" | "scroll" | "get_text" | "press" | "close" (required)
@@ -51,14 +83,10 @@ browser_control
   direction: "up" | "down" (for scroll)
 
 file_controller
-  action: "write" | "create_file" | "read" | "list" | "delete" | "move" | "copy" | "find" | "disk_usage" (required)
+  action: "write" | "create_file" | "read" | "list" | "delete" | "move" | "copy" | "find" | "disk_usage" | "open" (required)
   path: string — use "desktop" for Desktop folder
   name: string — filename
   content: string — file content (for write/create_file)
-
-cmd_control
-  task: string (required) — natural language description of what to do
-  visible: boolean (optional)
 
 computer_settings
   action: string (required)
@@ -74,10 +102,6 @@ computer_control
   direction: "up" | "down" (for scroll)
   description: string (for screen_find/screen_click)
 
-screen_process
-  text: string (required) — what to analyze or ask about the screen
-  angle: "screen" | "camera" (optional)
-
 send_message
   receiver: string (required)
   message_text: string (required)
@@ -88,22 +112,8 @@ reminder
   time: string HH:MM (required)
   message: string (required)
 
-desktop_control
-  action: "wallpaper" | "organize" | "clean" | "list" | "task" (required)
-  path: string (optional)
-  task: string (optional)
-
-youtube_video
-  action: "play" | "summarize" | "trending" (required)
-  query: string (for play)
-
 weather_report
   city: string (required)
-
-flight_finder
-  origin: string (required)
-  destination: string (required)
-  date: string (required)
 
 code_helper
   action: "write" | "edit" | "run" | "explain" (required)
@@ -115,46 +125,6 @@ code_helper
 dev_agent
   description: string (required)
   language: string (optional)
-EXAMPLES:
-
-Goal: "research mechanical engineering and save it to a notepad file"
-Steps:
-
-web_search | query: "mechanical engineering overview definition history"
-web_search | query: "mechanical engineering applications and future trends"
-file_controller | action: write, path: desktop, name: mechanical_engineering.txt, content: "MECHANICAL ENGINEERING RESEARCH\n\nThis file will be filled with web research results."
-cmd_control | task: "open mechanical_engineering.txt on desktop with notepad"
-
-Goal: "What is the price of Bitcoin"
-Steps:
-
-web_search | query: "Bitcoin price today USD"
-
-Goal: "List the files on the desktop and find the largest 5 files"
-Steps:
-
-file_controller | action: list, path: desktop
-file_controller | action: largest, path: desktop, count: 5
-
-Goal: "Install PUBG from Steam"
-Steps:
-
-game_updater | action: install, platform: steam, game_name: "PUBG"
-
-Goal: "Update all my Steam games"
-Steps:
-
-game_updater | action: update, platform: steam
-
-Goal: "Send John a message on WhatsApp saying there is a meeting tomorrow"
-Steps:
-
-send_message | receiver: John, message_text: "There is a meeting tomorrow", platform: WhatsApp
-
-Goal: "Open the clock and set a reminder for 30 minutes later"
-Steps:
-
-reminder | date: [today], time: [now+30min], message: "Reminder"
 
 OUTPUT — return ONLY valid JSON, no markdown, no explanation, no code blocks:
 {
@@ -174,38 +144,41 @@ OUTPUT — return ONLY valid JSON, no markdown, no explanation, no code blocks:
 
 def _get_api_key() -> str:
     with open(API_CONFIG_PATH, "r", encoding="utf-8") as f:
-        return json.load(f)["gemini_api_key"]
+        return json.load(f).get("gemini_api_key", "")
+
+
+def _sanitize_steps(steps: list, goal: str) -> list:
+    for step in steps:
+        tool = step.get("tool", "")
+        if tool in ("generated_code", "cmd_control"):
+            desc = step.get("description", goal)
+            step["tool"] = "web_search"
+            step["parameters"] = {"query": desc[:200]}
+    return steps
 
 
 def create_plan(goal: str, context: str = "") -> dict:
-    import google.generativeai as genai
-
-    genai.configure(api_key=_get_api_key())
-    model = genai.GenerativeModel(
-        model_name="gemini-2.5-flash-lite",
-        system_instruction=PLANNER_PROMPT
-    )
+    client = genai.Client(api_key=_get_api_key())
 
     user_input = f"Goal: {goal}"
     if context:
         user_input += f"\n\nContext: {context}"
 
     try:
-        response = model.generate_content(user_input)
-        text     = response.text.strip()
-        text     = re.sub(r"```(?:json)?", "", text).strip().rstrip("`").strip()
+        response = client.models.generate_content(
+            model="gemini-2.5-flash-lite",
+            contents=user_input,
+            config=types.GenerateContentConfig(system_instruction=PLANNER_PROMPT),
+        )
+        text = (response.text or "").strip()
+        text = re.sub(r"```(?:json)?", "", text).strip().rstrip("`").strip()
 
         plan = json.loads(text)
 
         if "steps" not in plan or not isinstance(plan["steps"], list):
             raise ValueError("Invalid plan structure")
 
-        for step in plan["steps"]:
-            if step.get("tool") in ("generated_code",):
-                print(f"[Planner] ⚠️ generated_code detected in step {step.get('step')} — replacing with web_search")
-                desc = step.get("description", goal)
-                step["tool"] = "web_search"
-                step["parameters"] = {"query": desc[:200]}
+        plan["steps"] = _sanitize_steps(plan["steps"], goal)
 
         print(f"[Planner] ✅ Plan: {len(plan['steps'])} steps")
         for s in plan["steps"]:
@@ -213,9 +186,6 @@ def create_plan(goal: str, context: str = "") -> dict:
 
         return plan
 
-    except json.JSONDecodeError as e:
-        print(f"[Planner] ⚠️ JSON parse failed: {e}")
-        return _fallback_plan(goal)
     except Exception as e:
         print(f"[Planner] ⚠️ Planning failed: {e}")
         return _fallback_plan(goal)
@@ -231,20 +201,14 @@ def _fallback_plan(goal: str) -> dict:
                 "tool": "web_search",
                 "description": f"Search for: {goal}",
                 "parameters": {"query": goal},
-                "critical": True
+                "critical": True,
             }
-        ]
+        ],
     }
 
 
 def replan(goal: str, completed_steps: list, failed_step: dict, error: str) -> dict:
-    import google.generativeai as genai
-
-    genai.configure(api_key=_get_api_key())
-    model = genai.GenerativeModel(
-        model_name="gemini-2.5-flash",
-        system_instruction=PLANNER_PROMPT
-    )
+    client = genai.Client(api_key=_get_api_key())
 
     completed_summary = "\n".join(
         f"  - Step {s['step']} ({s['tool']}): DONE" for s in completed_steps
@@ -261,16 +225,15 @@ Error: {error}
 Create a REVISED plan for the remaining work only. Do not repeat completed steps."""
 
     try:
-        response = model.generate_content(prompt)
-        text     = response.text.strip()
-        text     = re.sub(r"```(?:json)?", "", text).strip().rstrip("`").strip()
-        plan     = json.loads(text)
-
-        for step in plan.get("steps", []):
-            if step.get("tool") == "generated_code":
-                step["tool"] = "web_search"
-                step["parameters"] = {"query": step.get("description", goal)[:200]}
-
+        response = client.models.generate_content(
+            model="gemini-2.5-flash",
+            contents=prompt,
+            config=types.GenerateContentConfig(system_instruction=PLANNER_PROMPT),
+        )
+        text = (response.text or "").strip()
+        text = re.sub(r"```(?:json)?", "", text).strip().rstrip("`").strip()
+        plan = json.loads(text)
+        plan["steps"] = _sanitize_steps(plan.get("steps", []), goal)
         print(f"[Planner] 🔄 Revised plan: {len(plan['steps'])} steps")
         return plan
     except Exception as e:

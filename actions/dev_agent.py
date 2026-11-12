@@ -3,7 +3,18 @@ import sys
 import json
 import re
 import time
+import builtins as _builtins
 from pathlib import Path
+
+
+def print(*args, **kwargs):  # noqa: A001 — console-safe logging (emoji on cp1252 consoles)
+    try:
+        _builtins.print(*args, **kwargs)
+    except (UnicodeEncodeError, OSError, AttributeError, ValueError):
+        try:
+            _builtins.print(*[str(a).encode("ascii", "replace").decode("ascii") for a in args], **kwargs)
+        except Exception:
+            pass
 
 
 def get_base_dir():
@@ -14,7 +25,8 @@ def get_base_dir():
 
 BASE_DIR         = get_base_dir()
 API_CONFIG_PATH  = BASE_DIR / "config" / "api_keys.json"
-PROJECTS_DIR     = Path.home() / "Desktop" / "JarvisProjects"
+_ONEDRIVE_DESK   = Path.home() / "OneDrive" / "Desktop"
+PROJECTS_DIR     = (_ONEDRIVE_DESK if _ONEDRIVE_DESK.exists() else (Path.home() / "Desktop")) / "JarvisProjects"
 MAX_FIX_ATTEMPTS = 5
 MODEL_PLANNER    = "gemini-2.5-flash"
 MODEL_WRITER     = "gemini-2.5-flash"
@@ -24,10 +36,22 @@ def _get_api_key() -> str:
         return json.load(f)["gemini_api_key"]
 
 
+class _SimpleResp:
+    def __init__(self, text: str):
+        self.text = text
+
+
+class _GenAIModelWrapper:
+    def __init__(self, model_name: str):
+        self.model_name = model_name
+
+    def generate_content(self, prompt: str):
+        from core.ai_client import generate_text_with_retry
+        return _SimpleResp(generate_text_with_retry(prompt))
+
+
 def _get_model(model_name: str):
-    import google.generativeai as genai
-    genai.configure(api_key=_get_api_key())
-    return genai.GenerativeModel(model_name)
+    return _GenAIModelWrapper(model_name)
 
 
 def _strip_fences(text: str) -> str:
@@ -265,20 +289,25 @@ def _install_dependencies(dependencies: list[str], project_dir: Path) -> str:
         return f"Install error (non-fatal): {e}"
 
 def _open_vscode(project_dir: Path) -> bool:
+    import shutil
     vscode_candidates = [
-        "code",
+        shutil.which("code"),
+        rf"C:\Users\{Path.home().name}\AppData\Local\Programs\Microsoft VS Code\Code.exe",
         rf"C:\Users\{Path.home().name}\AppData\Local\Programs\Microsoft VS Code\bin\code.cmd",
+        r"C:\Program Files\Microsoft VS Code\Code.exe",
         r"C:\Program Files\Microsoft VS Code\bin\code.cmd",
     ]
     for cmd in vscode_candidates:
+        if not cmd or (cmd != "code" and not Path(cmd).exists()):
+            continue
         try:
             subprocess.Popen(
                 [cmd, str(project_dir)],
-                shell=True,
+                shell=False,
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL
             )
-            time.sleep(1.5)
+            time.sleep(1.0)
             print(f"[DevAgent] 💻 VSCode opened: {project_dir}")
             return True
         except Exception:

@@ -1,5 +1,5 @@
 """
-core/long_conversation.py — Long-Horizon Context & Multi-Turn Dialogue Engine for JARVIS Mark 58
+core/long_conversation.py — Long-Horizon Context & Multi-Turn Dialogue Engine for JARVIS Mark 78
 Enables JARVIS to hold extended, coherent, multi-hour conversations across complex technical,
 academic, and strategic topics without context collapse, amnesia, or loss of continuity.
 

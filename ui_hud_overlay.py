@@ -1,5 +1,5 @@
 """
-ui_hud_overlay.py — Glassmorphic Floating Desktop HUD Overlay for JARVIS Mark 58
+ui_hud_overlay.py — Glassmorphic Floating Desktop HUD Overlay for JARVIS Mark 78
 Lightweight, frameless, semi-transparent PyQt window showing live system telemetry,
 GPU status, active AI state, and Iron Man Arc-Reactor visualizer.
 Supports both PyQt6 (primary) and PyQt5 (fallback) dynamically.
@@ -23,23 +23,23 @@ except ImportError:
 
 
 class FloatingHUDOverlay(QWidget):
-    """Floating Glassmorphic Desktop HUD Widget for MARK 58."""
+    """Floating Glassmorphic Desktop HUD Widget for MARK 78."""
 
     def __init__(self):
         super().__init__()
         self.init_ui()
         self.drag_position = QPoint()
 
-        # Telemetry timer (3s interval to save power & CPU load)
+        # Telemetry timer (4s interval to save power & CPU load)
         self.timer = QTimer(self)
         self.timer.timeout.connect(self.update_telemetry)
-        self.timer.start(3000)
+        self.timer.start(4000)
 
-        # Pulse animation angle (150ms interval for low-power rendering)
+        # Eco pulse animation angle (500ms interval for ultra-low-power rendering)
         self.pulse_angle = 0
         self.pulse_timer = QTimer(self)
         self.pulse_timer.timeout.connect(self.update_pulse)
-        self.pulse_timer.start(150)
+        self.pulse_timer.start(500)
 
         self.cpu_pct = 0
         self.ram_pct = 0
@@ -64,7 +64,7 @@ class FloatingHUDOverlay(QWidget):
         layout.setContentsMargins(15, 12, 15, 12)
 
         # Header Label
-        self.title_label = QLabel("J.A.R.V.I.S. MARK 58 // APEX TELEMETRY")
+        self.title_label = QLabel("J.A.R.V.I.S. MARK 78 // APEX TELEMETRY")
         self.title_label.setStyleSheet("color: #00d4ff; font-family: 'Segoe UI', Arial; font-weight: bold; font-size: 10px; letter-spacing: 1px;")
 
         # Status Label
@@ -72,7 +72,7 @@ class FloatingHUDOverlay(QWidget):
         self.status_label.setStyleSheet("color: #e0f7fc; font-family: 'Consolas', monospace; font-size: 11px;")
 
         # AI Mode Tag
-        self.mode_label = QLabel("MARK 58 SUIT: ONLINE [APEX CORE]")
+        self.mode_label = QLabel("MARK 78 SUIT: ONLINE [ALPHA CORE]")
         self.mode_label.setStyleSheet("color: #00ff88; font-family: 'Segoe UI', Arial; font-weight: bold; font-size: 10px;")
 
         layout.addWidget(self.title_label)

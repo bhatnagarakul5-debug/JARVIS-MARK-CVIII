@@ -78,10 +78,16 @@ def tab_manager(parameters: dict, player=None) -> str:
                 return f"No saved session found for '{session_name}'."
                 
             urls = data[session_name]
+            import webbrowser
+            from urllib.parse import urlparse
+            restored_count = 0
             for url in urls:
-                os.system(f'start chrome "{url}"')
-                time.sleep(0.5)
-            return f"Restored session '{session_name}'."
+                parsed = urlparse(str(url).strip())
+                if parsed.scheme in ("http", "https") and parsed.netloc:
+                    webbrowser.open(str(url).strip())
+                    restored_count += 1
+                    time.sleep(0.3)
+            return f"Restored {restored_count} tab(s) from session '{session_name}'."
 
         elif action == 'switch':
             # Simple Alt+Tab logic

@@ -1,21 +1,19 @@
 """
-actions/davinci_advanced.py — Advanced AI DaVinci Resolve Beat-Sync Cutting & Subtitle Generator
-Calculates audio tempo/beats to place cut markers on timeline, and auto-generates subtitle markers.
+actions/davinci_advanced.py — Advanced AI DaVinci Resolve & Standalone Beat-Sync Cutting & Subtitle Generator
+Supports both live DaVinci Resolve timeline markers/cuts and standalone internet-assisted .srt subtitle generation.
 """
 
-import os
-import sys
 import time
-import json
 import pyautogui
 from pathlib import Path
+from actions.auto_video_editor import generate_video_subtitles, color_grade_video
+from actions.file_controller import resolve_any_file
 
 pyautogui.FAILSAFE = True
 pyautogui.PAUSE = 0.08
 
 
 def _focus_davinci() -> bool:
-    """Focuses DaVinci Resolve window."""
     try:
         import pygetwindow as gw
         wins = gw.getWindowsWithTitle("DaVinci Resolve")
@@ -32,84 +30,80 @@ def _focus_davinci() -> bool:
 
 
 def beat_sync_cuts(bpm: int = 120, player=None) -> str:
-    """
-    Places timeline blade cuts and markers synced to background music beats.
-    bpm: Beats Per Minute (default 120 = 0.5s cuts)
-    """
     if not _focus_davinci():
-        return "Please open DaVinci Resolve first, sir."
+        return "Please open DaVinci Resolve first to place timeline beat-sync cuts, sir."
 
-    pyautogui.hotkey("shift", "4") # Edit Page
+    pyautogui.hotkey("shift", "4")  # Edit Page
     time.sleep(0.5)
-    pyautogui.press("home") # Playhead to start
+    pyautogui.press("home")
 
-    # Calculate cut interval seconds from BPM
     seconds_per_beat = 60.0 / max(60, min(180, bpm))
     cuts_made = 0
 
     if player and hasattr(player, "write_log"):
-        player.write_log(f"DAVINCI: Executing Beat-Sync cuts at {bpm} BPM ({seconds_per_beat:.2f}s intervals)...")
+        player.write_log(f"DAVINCI: Beat-Sync cuts at {bpm} BPM ({seconds_per_beat:.2f}s)...")
 
     for _ in range(6):
-        pyautogui.hotkey("ctrl", "b") # Razor Cut
+        pyautogui.hotkey("ctrl", "b")
         cuts_made += 1
-        pyautogui.press("m") # Add Marker
+        pyautogui.press("m")
         time.sleep(seconds_per_beat)
 
-    msg = f"Beat-Sync complete! Placed {cuts_made} rhythmic beat cuts & markers at {bpm} BPM on DaVinci timeline."
-    if player and hasattr(player, "push_notification"):
-        player.push_notification("DaVinci Beat-Sync Complete", "success")
-    return msg
+    return f"Beat-Sync complete! Placed {cuts_made} rhythmic beat cuts & markers at {bpm} BPM on the DaVinci timeline."
 
 
-def generate_subtitles(language: str = "English", player=None) -> str:
+def generate_subtitles(language: str = "English", video_path: str = "", player=None) -> str:
     """
-    Generates AI subtitle markers and text overlays across the active DaVinci timeline.
+    If a video_path is provided, generates real timestamped .srt subtitles (with live internet verification)
+    and burns them into the video. If DaVinci Resolve is open, also adds timeline subtitle markers.
     """
-    if not _focus_davinci():
-        return "Please open DaVinci Resolve first, sir."
+    results = []
+    if video_path:
+        target = resolve_any_file(video_path) or Path(video_path).expanduser()
+        if target.exists() and target.is_file():
+            results.append(generate_video_subtitles(target, language=language, burn_in=True))
 
-    pyautogui.hotkey("shift", "4") # Edit Page
-    time.sleep(0.5)
-    pyautogui.press("home")
+    if _focus_davinci():
+        pyautogui.hotkey("shift", "4")
+        time.sleep(0.4)
+        pyautogui.press("home")
+        for i in range(4):
+            pyautogui.press("m")
+            time.sleep(0.1)
+            pyautogui.press("m")
+            time.sleep(0.2)
+            pyautogui.write(f"Subtitle Segment #{i + 1} [{language}]", interval=0.02)
+            pyautogui.press("enter")
+            time.sleep(0.6)
+        results.append(f"Added subtitle track markers ({language}) on the active DaVinci Resolve timeline.")
 
-    if player and hasattr(player, "write_log"):
-        player.write_log(f"DAVINCI: Generating AI Subtitle Markers ({language})...")
-
-    # Add subtitle track markers (Ctrl + Shift + M or M)
-    markers_added = 4
-    for i in range(markers_added):
-        pyautogui.press("m") # Add marker
-        time.sleep(0.1)
-        pyautogui.press("m") # Open marker dialog
-        time.sleep(0.2)
-        pyautogui.write(f"Subtitle Segment #{i+1} [{language}]", interval=0.02)
-        pyautogui.press("enter")
-        time.sleep(1.0)
-
-    msg = f"AI Subtitles generated! Added {markers_added} subtitle markers across DaVinci timeline."
-    if player and hasattr(player, "push_notification"):
-        player.push_notification("DaVinci Subtitles Created", "info")
-    return msg
+    if not results:
+        return "Specify a video file name to generate .srt subtitles, or open DaVinci Resolve to place timeline captions, sir."
+    return " ".join(results)
 
 
 def davinci_advanced_control(parameters: dict, player=None) -> str:
     """
-    Advanced DaVinci Resolve AI Controller.
-
     parameters:
-        action   : beat_sync | subtitles
-        bpm      : Target BPM for beat sync (default 120)
-        language : Language for subtitles (default "English")
+        action     : beat_sync | subtitles | color_grade
+        bpm        : Target BPM for beat sync (default 120)
+        language   : Language for subtitles (default "English")
+        video_path : Optional video file name or path for standalone .srt / color grading
+        style      : Optional color grading preset
     """
     params = parameters or {}
     action = (params.get("action") or "beat_sync").lower().strip()
     bpm = int(params.get("bpm", 120))
     lang = params.get("language", "English").strip()
+    vpath = (params.get("video_path") or params.get("media_path") or params.get("file_path") or "").strip()
+    style = (params.get("style") or "teal_orange").strip()
 
     if action in ("beat_sync", "beats", "rhythm"):
         return beat_sync_cuts(bpm=bpm, player=player)
-    elif action in ("subtitles", "captions", "subtitle"):
-        return generate_subtitles(language=lang, player=player)
+    if action in ("subtitles", "captions", "subtitle"):
+        return generate_subtitles(language=lang, video_path=vpath, player=player)
+    if action in ("color_grade", "grade", "colour_grade") and vpath:
+        target = resolve_any_file(vpath) or Path(vpath).expanduser()
+        return color_grade_video(target, style=style)
 
-    return davinci_advanced_control({"action": "beat_sync"}, player=player)
+    return beat_sync_cuts(bpm=bpm, player=player)

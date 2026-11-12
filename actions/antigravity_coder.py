@@ -27,10 +27,25 @@ def _check_sdk_available() -> bool:
         return False
 
 
+import shutil
+
+
+def _find_agy_path() -> str | None:
+    """Finds agy executable in PATH or LocalAppData."""
+    cand = shutil.which("agy") or shutil.which("agy.exe")
+    if cand:
+        return cand
+    local = Path(os.environ.get("LOCALAPPDATA", "")) / "agy" / "bin" / "agy.exe"
+    return str(local) if local.exists() else None
+
+
 def _check_agy_cli() -> bool:
-    """Checks if Antigravity CLI ('agy') is installed and accessible in PATH."""
+    """Checks if Antigravity CLI ('agy') is installed and accessible."""
+    bin_path = _find_agy_path()
+    if not bin_path:
+        return False
     try:
-        res = subprocess.run(["agy", "--version"], capture_output=True, text=True, timeout=3)
+        res = subprocess.run([bin_path, "--version"], capture_output=True, text=True, timeout=4)
         return res.returncode == 0 or "antigravity" in res.stdout.lower() or "agy" in res.stdout.lower()
     except Exception:
         return False
@@ -77,11 +92,21 @@ class AntigravityCoderEngine:
             if _check_sdk_available():
                 output = self._run_sdk_agent_task(prompt, target_file, player=player)
             elif _check_agy_cli():
-                cmd = ["agy", "--prompt", prompt]
-                if target_file:
-                    cmd.extend(["--file", target_file])
-                
-                res = subprocess.run(cmd, cwd=str(BASE_DIR), capture_output=True, text=True, timeout=60)
+                agy_bin = _find_agy_path()
+                full_p = f"Target file: {target_file}\n{prompt}" if target_file else prompt
+                cmd = [
+                    agy_bin, "-p", full_p,
+                    "--mode", "accept-edits",
+                    "--sandbox",
+                    "--print-timeout", "90s"
+                ]
+                creationflags = 0x08000000 if os.name == "nt" else 0
+                res = subprocess.run(
+                    cmd, cwd=str(BASE_DIR),
+                    capture_output=True, text=True,
+                    timeout=120, encoding="utf-8", errors="replace",
+                    creationflags=creationflags
+                )
                 output = res.stdout.strip() or res.stderr.strip() or "Antigravity task completed."
             else:
                 # Direct Gemini Coder fallback for autonomous code editing
@@ -133,6 +158,10 @@ class AntigravityCoderEngine:
     def _fallback_ai_code_edit(self, prompt: str, target_file: str | None = None) -> str:
         """Internal Gemini Coder fallback for autonomous file modifications."""
         try:
+            if target_file:
+                from actions.self_edit import edit_own_file
+                return edit_own_file(target_file, prompt)
+
             from google import genai
             key = ""
             if CONFIG_PATH.exists():
@@ -142,16 +171,16 @@ class AntigravityCoderEngine:
                 return "Gemini API key missing in config."
 
             client = genai.Client(api_key=key)
-            
+
             full_prompt = (
                 f"You are the Antigravity Autonomous Software Engineer.\n"
                 f"Task: {prompt}\n"
                 f"Target File: {target_file or 'Codebase'}\n"
-                f"Execute the requested code modifications cleanly. Return a concise report of what was changed."
+                f"Provide clean, complete code and a concise summary of the solution."
             )
             res = client.models.generate_content(
-                model="gemini-2.0-flash",
-                contents=full_prompt
+                model="gemini-2.5-flash",
+                contents=full_prompt,
             )
             return res.text.strip() if (res and res.text) else "Code task completed."
         except Exception as e:

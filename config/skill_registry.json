@@ -1,0 +1,8 @@
+{
+  "sovereign_unit_converter": {
+    "description": "Converts kilometers to miles with 4-decimal precision.",
+    "engine": "sovereign_direct",
+    "created": "2026-11-12 23:24",
+    "path": "actions/sovereign_unit_converter.py"
+  }
+}
