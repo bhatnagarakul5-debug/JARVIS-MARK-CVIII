@@ -5,7 +5,8 @@ import platform
 import shutil
 import subprocess
 from pathlib import Path
-from playwright.async_api import async_playwright, TimeoutError as PlaywrightTimeout
+
+PlaywrightTimeout = TimeoutError
 
 
 def _get_default_browser_id() -> str:
@@ -176,6 +177,9 @@ class _BrowserThread:
         self._loop.run_forever()
 
     async def _init(self):
+        global PlaywrightTimeout
+        from playwright.async_api import async_playwright, TimeoutError as _PwTimeout
+        PlaywrightTimeout = _PwTimeout
         self._playwright = await async_playwright().start()
 
     def run(self, coro, timeout: int = 30):

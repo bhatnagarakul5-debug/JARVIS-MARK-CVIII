@@ -4,14 +4,36 @@ Supports multimodal AI vision recognition with automatic fallback to local histo
 Clean string encoding for Windows CMD.
 """
 
-import cv2
-import numpy as np
+from __future__ import annotations
+
+import importlib
 import os
 import sys
 import json
 from pathlib import Path
-from google import genai
-from google.genai import types
+
+
+class _LazyMod:
+    def __init__(self, mod_name: str, on_load=None):
+        self._mod_name = mod_name
+        self._on_load = on_load
+        self._mod = None
+
+    def _load(self):
+        if self._mod is None:
+            self._mod = importlib.import_module(self._mod_name)
+            if self._on_load:
+                self._on_load(self._mod)
+        return self._mod
+
+    def __getattr__(self, name: str):
+        return getattr(self._load(), name)
+
+
+cv2 = _LazyMod("cv2", lambda m: m.ocl.setUseOpenCL(True))
+np = _LazyMod("numpy")
+genai = _LazyMod("google.genai")
+types = _LazyMod("google.genai.types")
 
 def get_base_dir() -> Path:
     if getattr(sys, "frozen", False):

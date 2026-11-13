@@ -573,6 +573,34 @@ def test_rust_phase7_deep_brain(tmp_path: Path):
     assert any("445" in t for t, _, _, _ in ptrs)
 
 
+def test_rust_phase8_zero_chrome_and_lazy_ram():
+    """Verify Phase-8 Volumetric Orb Rust Shader + Zero QtWebEngine/Chromium + Lazy Heavy Imports."""
+    import sys
+    import jarvis_rust_core
+    from core.rust_bridge import render_volumetric_orb_rgba, optimize_hardware
+
+    # 1. Volumetric Raymarched Plasma Orb Shader frame output
+    frame_idle = render_volumetric_orb_rgba(86, 1.25, 1.0, 0.5)
+    frame_war = render_volumetric_orb_rgba(86, 1.25, 5.0, 0.5)
+    assert isinstance(frame_idle, (bytes, bytearray))
+    assert len(frame_idle) == 86 * 86 * 4
+    # Corner pixel (0,0) must be transparent (alpha == 0); center pixel (43,43) opaque
+    assert frame_idle[3] == 0
+    center_offset = (43 * 86 + 43) * 4
+    assert frame_idle[center_offset + 3] > 200
+    assert frame_idle != frame_war
+
+    # 2. Chromium-free UI import (QtWebEngine must never be imported)
+    import ui
+    assert "PyQt6.QtWebEngineWidgets" not in sys.modules
+    assert "PyQt6.QtWebEngineCore" not in sys.modules
+
+    # 3. optimize_hardware must NOT pull cv2/pyautogui into fresh processes unnecessarily
+    reports = optimize_hardware()
+    assert any("Lazy-armed" in r or "OpenCV" in r for r in reports)
+
+
+
 
 
 

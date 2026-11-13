@@ -4,12 +4,36 @@
 # Slack (Ctrl+K), Instagram, LinkedIn, Phone Link, and Active Window Chat.
 # Uses Zero-Latency URI/Direct Launch + Native UIA (agent_desktop) + Clipboard Paste (Ctrl+V).
 
-import time
-import pyautogui
-import pyperclip
+from __future__ import annotations
 
-pyautogui.FAILSAFE = True
-pyautogui.PAUSE = 0.04
+import importlib
+import time
+
+
+class _LazyMod:
+    def __init__(self, mod_name: str, on_load=None):
+        self._mod_name = mod_name
+        self._on_load = on_load
+        self._mod = None
+
+    def _load(self):
+        if self._mod is None:
+            self._mod = importlib.import_module(self._mod_name)
+            if self._on_load:
+                self._on_load(self._mod)
+        return self._mod
+
+    def __getattr__(self, name: str):
+        return getattr(self._load(), name)
+
+
+def _init_pyautogui(m):
+    m.FAILSAFE = True
+    m.PAUSE = 0.04
+
+
+pyautogui = _LazyMod("pyautogui", _init_pyautogui)
+pyperclip = _LazyMod("pyperclip")
 
 
 def _paste_text(text: str):

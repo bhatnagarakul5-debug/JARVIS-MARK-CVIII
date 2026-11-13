@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 actions/anti_shoulder_surfer.py — Sentry Vision Privacy Shield & Anti-Shoulder Surfer Engine
 For J.A.R.V.I.S. Mark 108
@@ -15,14 +17,34 @@ Protects screen privacy in public spaces (college libraries, cafes, offices):
    - Automatically lifts the veil and restores the clear display once the onlooker steps away.
 """
 
-import cv2
-import numpy as np
+import importlib
 import time
 import threading
 import sys
 from pathlib import Path
 from typing import Optional, Dict, Any, Tuple
 from core.server_security import log_security_event
+
+
+class _LazyMod:
+    def __init__(self, mod_name: str, on_load=None):
+        self._mod_name = mod_name
+        self._on_load = on_load
+        self._mod = None
+
+    def _load(self):
+        if self._mod is None:
+            self._mod = importlib.import_module(self._mod_name)
+            if self._on_load:
+                self._on_load(self._mod)
+        return self._mod
+
+    def __getattr__(self, name: str):
+        return getattr(self._load(), name)
+
+
+cv2 = _LazyMod("cv2", lambda m: m.ocl.setUseOpenCL(True))
+np = _LazyMod("numpy")
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 CONFIG_DIR = BASE_DIR / "config"
@@ -56,15 +78,20 @@ class AntiShoulderSurfer:
         self._last_sample_time = 0.0
         self._player = None
         self._speak_fn = None
+        self._vision_ready = False
+        self._hog = None
+        self._owner_hist = None
 
-        # Preload HOG People Detector (built into OpenCV binary — 0 extra downloads)
+    def _ensure_vision_loaded(self):
+        """Lazily initializes OpenCV HOG + reference histogram only when Sentry starts."""
+        if self._vision_ready:
+            return
+        self._vision_ready = True
         try:
             self._hog = cv2.HOGDescriptor()
             self._hog.setSVMDetector(cv2.HOGDescriptor_getDefaultPeopleDetector())
         except Exception:
             self._hog = None
-
-        # Preload Owner Face Reference Histogram
         self._owner_hist = self._load_owner_reference_histogram()
 
     def _load_owner_reference_histogram(self) -> Optional[np.ndarray]:
@@ -97,6 +124,7 @@ class AntiShoulderSurfer:
         if self._is_active:
             return "Anti-Shoulder Surfer is already active and monitoring your perimeter, sir."
 
+        self._ensure_vision_loaded()
         self._is_active = True
         self._consecutive_intruders = 0
         self._consecutive_clear = 0
@@ -212,6 +240,7 @@ class AntiShoulderSurfer:
         Briefly grabs 1 frame from webcam, detects human presence, then immediately frees camera.
         Returns True if an onlooker / shoulder-surfer is detected.
         """
+        self._ensure_vision_loaded()
         cap = None
         try:
             cap = cv2.VideoCapture(0)

@@ -3738,15 +3738,163 @@ fn analyze_exposed_ports_rust(
     pointers
 }
 
+#[inline(always)]
+fn orb_fract(x: f32) -> f32 {
+    x - x.floor()
+}
+
+#[inline(always)]
+fn orb_hash(n: f32) -> f32 {
+    orb_fract((n.sin()) * 43758.5453123)
+}
+
+#[inline(always)]
+fn orb_mix(a: f32, b: f32, t: f32) -> f32 {
+    a + (b - a) * t
+}
+
+#[inline(always)]
+fn orb_smoothstep(edge0: f32, edge1: f32, x: f32) -> f32 {
+    let t = ((x - edge0) / (edge1 - edge0)).clamp(0.0, 1.0);
+    t * t * (3.0 - 2.0 * t)
+}
+
+#[inline(always)]
+fn orb_noise3(x: f32, y: f32, z: f32) -> f32 {
+    let px = x.floor();
+    let py = y.floor();
+    let pz = z.floor();
+    let fx = orb_fract(x);
+    let fy = orb_fract(y);
+    let fz = orb_fract(z);
+    let ux = fx * fx * (3.0 - 2.0 * fx);
+    let uy = fy * fy * (3.0 - 2.0 * fy);
+    let uz = fz * fz * (3.0 - 2.0 * fz);
+    let n = px + py * 57.0 + 113.0 * pz;
+    let a = orb_mix(
+        orb_mix(orb_hash(n + 0.0), orb_hash(n + 1.0), ux),
+        orb_mix(orb_hash(n + 57.0), orb_hash(n + 58.0), ux),
+        uy,
+    );
+    let b = orb_mix(
+        orb_mix(orb_hash(n + 113.0), orb_hash(n + 114.0), ux),
+        orb_mix(orb_hash(n + 170.0), orb_hash(n + 171.0), ux),
+        uy,
+    );
+    orb_mix(a, b, uz)
+}
+
+/// Real-time 28-step Volumetric Raymarched Plasma Orb Shader in native Rust + Rayon.
+/// Replaces QWebEngineView/Chromium for NativeOrbCore (~0 MB browser overhead).
+#[pyfunction]
+fn render_volumetric_orb_rgba_rust<'py>(
+    py: Python<'py>,
+    size: usize,
+    time_sec: f32,
+    mode: f32,
+    pulse: f32,
+) -> Bound<'py, pyo3::types::PyBytes> {
+    let sz = size.clamp(16, 512);
+    let s_f = sz as f32;
+    let mode_i = mode.round() as i32;
+
+    let speed_mult = if mode_i == 2 {
+        3.5
+    } else if mode_i == 1 || mode_i == 3 {
+        2.0
+    } else {
+        0.85
+    };
+    let rot_y = time_sec * 0.45 * speed_mult;
+    let rot_x = rot_y * 0.6;
+    let (sy, cy) = rot_y.sin_cos();
+    let (sx, cx) = rot_x.sin_cos();
+
+    let rot_vec = |vx: f32, vy: f32, vz: f32| -> (f32, f32, f32) {
+        let x1 = vx;
+        let y1 = cx * vy + sx * vz;
+        let z1 = -sx * vy + cx * vz;
+        (cy * x1 - sy * z1, y1, sy * x1 + cy * z1)
+    };
+
+    let ro = rot_vec(0.0, 0.0, 2.4);
+    let radius = 0.70 + (time_sec * 2.5).sin() * 0.02 * (1.0 + pulse * 0.5);
+    let turb_shift = time_sec * speed_mult * 1.2;
+
+    let (cyan_r, cyan_g, cyan_b, cob_r, cob_g, cob_b) = match mode_i {
+        5 => (1.0f32, 0.15, 0.25, 0.5, 0.01, 0.05),  // War Mode
+        2 => (0.75, 0.20, 1.00, 0.25, 0.02, 0.70),   // Thinking / Piloting
+        1 | 3 => (0.00, 1.00, 0.65, 0.02, 0.22, 0.85), // Listening / Speaking
+        4 => (1.00, 0.18, 0.35, 0.40, 0.02, 0.08),   // Muted
+        _ => (0.00, 0.88, 1.00, 0.02, 0.22, 0.85),   // Idle / Default
+    };
+
+    let mut rgba = vec![0u8; sz * sz * 4];
+    rgba.par_chunks_mut(sz * 4)
+        .enumerate()
+        .for_each(|(py_row, row)| {
+            let uv_y = (0.5 * s_f - (py_row as f32 + 0.5)) / s_f;
+            for px in 0..sz {
+                let uv_x = (px as f32 + 0.5 - 0.5 * s_f) / s_f;
+                let dist_center = (uv_x * uv_x + uv_y * uv_y).sqrt();
+                if dist_center > 0.51 {
+                    continue;
+                }
+
+                let inv_len = 1.0 / (uv_x * uv_x + uv_y * uv_y + 1.0).sqrt();
+                let rd = rot_vec(uv_x * inv_len, uv_y * inv_len, -inv_len);
+
+                let mut glow_accum = 0.0f32;
+                let mut t = 0.0f32;
+                for _ in 0..28 {
+                    let px3 = ro.0 + rd.0 * t;
+                    let py3 = ro.1 + rd.1 * t;
+                    let pz3 = ro.2 + rd.2 * t;
+                    let turb = orb_noise3(
+                        px3 * 2.8 + turb_shift,
+                        py3 * 2.8 + turb_shift,
+                        pz3 * 2.8 + turb_shift,
+                    ) * 0.22;
+                    let d = (px3 * px3 + py3 * py3 + pz3 * pz3).sqrt() - radius + turb;
+                    glow_accum += 0.016 / (d.abs() + 0.065);
+                    if d < 0.002 || t > 4.2 {
+                        break;
+                    }
+                    t += d * 0.68;
+                }
+
+                let g_mix = (glow_accum * 0.38).clamp(0.0, 1.0);
+                let core_bloom = (glow_accum * 0.14).max(0.0).powf(2.8);
+                let pulse_boost = 1.0 + pulse * 0.25;
+                let rim = orb_smoothstep(0.72, 0.38, dist_center);
+
+                let r = (orb_mix(cob_r, cyan_r, g_mix) + 0.90 * core_bloom) * rim * pulse_boost;
+                let g = (orb_mix(cob_g, cyan_g, g_mix) + 0.98 * core_bloom) * rim * pulse_boost;
+                let b = (orb_mix(cob_b, cyan_b, g_mix) + 1.00 * core_bloom) * rim * pulse_boost;
+
+                let base_a = (glow_accum * 0.5 + if dist_center < 0.44 { 0.95 } else { 0.0 }).clamp(0.0, 1.0);
+                let alpha = (base_a * orb_smoothstep(0.50, 0.42, dist_center)).clamp(0.0, 1.0);
+
+                let idx = px * 4;
+                row[idx] = (r.clamp(0.0, 1.0) * 255.0) as u8;
+                row[idx + 1] = (g.clamp(0.0, 1.0) * 255.0) as u8;
+                row[idx + 2] = (b.clamp(0.0, 1.0) * 255.0) as u8;
+                row[idx + 3] = (alpha * 255.0) as u8;
+            }
+        });
+
+    pyo3::types::PyBytes::new(py, &rgba)
+}
+
 #[pyfunction]
 fn rust_engine_info() -> HashMap<String, String> {
     let mut info = HashMap::new();
     info.insert("engine".to_string(), "jarvis_rust_core".to_string());
-    info.insert("version".to_string(), "108.7.0 (Sovereign Core Phase-7 Deep Brain Exoskeleton)".to_string());
+    info.insert("version".to_string(), "108.8.0 (Sovereign Core Phase-8 Zero-Chrome & Lazy Memory Core)".to_string());
     info.insert("threads".to_string(), rayon::current_num_threads().to_string());
     info.insert(
         "subsystems".to_string(),
-        "security_seal, prompt_injection_shield, bounded_rate_limiter, path_safety_validator, python_code_safety_auditor, chained_security_ledger, port_risk_analyzer, destructive_guard, win32_clipboard_wiper, clipboard_history_vault, git_secret_auditor, doc_scanner, doc_classifier, markdown_normalizer, bibliography_ungluer, source_authority_tiering, math_validator, spreadsheet_validator, citation_matcher, claim_classifier, claim_concordance_verifier, ai_detector, watermark_scrubber, camera_vision, face_histogram, audio_dsp, memory_bm25_vector, fast_file_search, win32_ram_trimmer, win32_process_priority, cpu_thread_governor, win32_ghost_protocol, hardware_equilibrium_engine, tcp_latency_probe, bloat_process_detector, diagnostics_formatter, project_scaffolder, long_conversation_engine, rss_xml_parser, url_filter, pycache_cleaner, emotional_spectrum, human_reactions, conversation_topic_tracker, conversation_jsonl_logger, weather_url_builder, reminder_parser, voice_macro_planner, archive_url_builder, parallel_task_formatter, offline_win32_engine, self_evolution_parsers".to_string(),
+        "security_seal, prompt_injection_shield, bounded_rate_limiter, path_safety_validator, python_code_safety_auditor, chained_security_ledger, port_risk_analyzer, destructive_guard, win32_clipboard_wiper, clipboard_history_vault, git_secret_auditor, doc_scanner, doc_classifier, markdown_normalizer, bibliography_ungluer, source_authority_tiering, math_validator, spreadsheet_validator, citation_matcher, claim_classifier, claim_concordance_verifier, ai_detector, watermark_scrubber, camera_vision, face_histogram, audio_dsp, memory_bm25_vector, fast_file_search, win32_ram_trimmer, win32_process_priority, cpu_thread_governor, win32_ghost_protocol, hardware_equilibrium_engine, tcp_latency_probe, bloat_process_detector, diagnostics_formatter, project_scaffolder, long_conversation_engine, rss_xml_parser, url_filter, pycache_cleaner, emotional_spectrum, human_reactions, conversation_topic_tracker, conversation_jsonl_logger, weather_url_builder, reminder_parser, voice_macro_planner, archive_url_builder, parallel_task_formatter, offline_win32_engine, self_evolution_parsers, volumetric_orb_shader".to_string(),
     );
     info
 }
@@ -3826,6 +3974,7 @@ fn jarvis_rust_core(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(filter_http_urls_rust, m)?)?;
     m.add_function(wrap_pyfunction!(append_chained_security_event_rust, m)?)?;
     m.add_function(wrap_pyfunction!(analyze_exposed_ports_rust, m)?)?;
+    m.add_function(wrap_pyfunction!(render_volumetric_orb_rgba_rust, m)?)?;
     m.add_function(wrap_pyfunction!(rust_engine_info, m)?)?;
     Ok(())
 }

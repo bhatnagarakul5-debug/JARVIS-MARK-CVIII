@@ -74,117 +74,27 @@ from memory.memory_manager import (
 
 from core.rust_bridge import optimize_hardware, trim_process_memory, start_memory_compactor
 
+from core.rust_bridge import weather_action, clipboard_manager, start_clipboard_monitor
 
+from core.rust_bridge import (
 
-from actions.file_processor import file_processor
+    tab_manager, focus_mode, fetch_news_intel, archive_intel,
 
-from actions.flight_finder     import flight_finder
+    run_system_diagnostics, execute_voice_macro, cooldown_control,
 
-from actions.open_app          import open_app
+    war_mode_control, ghost_protocol, create_project_workspace,
 
-from core.rust_bridge import weather_action
+    autonomous_watchdog, parallel_orchestrator, offline_fallback,
 
-from actions.send_message      import send_message, make_call, unlock_whatsapp_locked_chats
+    get_human_reactions_engine, handle_human_reaction_tool,
 
-from actions.reminder          import reminder
+    get_hardware_equilibrium_governor, handle_hardware_equilibrium_tool,
 
-from actions.computer_settings import computer_settings
+    get_long_conversation_manager, log_exchange,
 
-from actions.screen_processor  import screen_process
-
-from actions.youtube_video     import youtube_video
-
-from actions.desktop           import desktop_control
-
-from actions.browser_control   import browser_control
-
-from actions.file_controller   import file_controller
-
-from actions.code_helper       import code_helper
-
-from actions.dev_agent         import dev_agent
-
-from actions.web_search        import web_search as web_search_action
-
-from actions.computer_control  import computer_control
-
-from actions.agent_desktop     import agent_desktop_control
-
-from actions.game_updater      import game_updater
-
-from actions.self_edit         import self_edit
-
-from actions.spotify_control   import spotify_control
-
-from actions.smart_reply       import smart_reply
-
-
-
-from actions.email_compose     import email_compose
-
-from core.rust_bridge import clipboard_manager, start_clipboard_monitor
-
-from actions.scheduler         import schedule_task, start_scheduler
-
-from core.rust_bridge import tab_manager
-
-from actions.daily_briefing    import daily_briefing
-
-from actions.calendar_manager import calendar_manager
-
-from actions.document_chat     import document_chat
-
-from core.rust_bridge import focus_mode
-
-from actions.personality_engine import set_personality, get_personality_instruction
-
-from actions.camera_system     import camera_control
-
-from actions.davinci_control    import davinci_control
-
-from actions.auto_video_editor import auto_edit_video
-
-from actions.audio_device_manager import audio_device_control, audio_device_mgr
-
-from core.rust_bridge import fetch_news_intel
-
-from core.rust_bridge import archive_intel
-
-from core.rust_bridge import run_system_diagnostics
-
-from actions.davinci_advanced import davinci_advanced_control
-
-from actions.security_shield import security_shield_control
-
-from core.rust_bridge import execute_voice_macro
-
-from actions.remote_bridge import remote_bridge_control
-
-from core.rust_bridge import cooldown_control
-
-from actions.whatsapp_reader import read_whatsapp_messages
-
-from core.rust_bridge import war_mode_control
-
-from core.rust_bridge import ghost_protocol
-
-from core.rust_bridge import create_project_workspace
-
-from actions.antigravity_coder import antigravity_coder
-
-from actions.antigravity_ide_bridge import antigravity_ide_control
-
-from actions.file_watcher import smart_file_watcher, file_watcher_control
-
-from actions.call_manager import call_manager_control
-
-from core.rust_bridge import autonomous_watchdog
+)
 
 from core.skills_engine import mark_108_skills_control, mark_cviii_skills_control
-
-from core.rust_bridge import parallel_orchestrator
-
-from core.rust_bridge import offline_fallback
 
 from core.emotional_spectrum import (
 
@@ -193,34 +103,6 @@ from core.emotional_spectrum import (
     handle_emotional_spectrum_tool
 
 )
-
-from core.rust_bridge import (
-
-    get_human_reactions_engine, handle_human_reaction_tool
-
-)
-
-from core.rust_bridge import (
-
-    get_hardware_equilibrium_governor, handle_hardware_equilibrium_tool
-
-)
-
-from core.rust_bridge import get_long_conversation_manager
-
-from core.humanizer import humanizer_tool
-
-from actions.file_generator import universal_file_creator
-
-from actions.exam_companion import exam_companion
-
-from actions.deep_research import deep_research
-
-from actions.college_hub import college_hub
-
-from actions.presentation_designer import presentation_designer
-
-from core.rust_bridge import log_exchange
 
 from core.server_security import (
 
@@ -232,7 +114,71 @@ from core.server_security import (
 
 )
 
-from actions.anti_shoulder_surfer import anti_shoulder_surfer_tool, get_anti_shoulder_surfer
+from actions.scheduler         import schedule_task, start_scheduler
+
+from actions.file_watcher      import smart_file_watcher, file_watcher_control
+
+from actions.audio_device_manager import audio_device_control, audio_device_mgr
+
+
+def _lazy_fn(module_path: str, attr_name: str):
+    """Defers importing heavy action libraries until first invocation (Zero idle RAM)."""
+    def _proxy(*args, **kwargs):
+        import importlib
+        mod = importlib.import_module(module_path)
+        fn = getattr(mod, attr_name)
+        return fn(*args, **kwargs)
+    _proxy.__name__ = attr_name
+    _proxy.__qualname__ = f"{module_path}.{attr_name}"
+    return _proxy
+
+
+file_processor               = _lazy_fn("actions.file_processor", "file_processor")
+flight_finder                = _lazy_fn("actions.flight_finder", "flight_finder")
+open_app                     = _lazy_fn("actions.open_app", "open_app")
+send_message                 = _lazy_fn("actions.send_message", "send_message")
+make_call                    = _lazy_fn("actions.send_message", "make_call")
+unlock_whatsapp_locked_chats = _lazy_fn("actions.send_message", "unlock_whatsapp_locked_chats")
+reminder                     = _lazy_fn("actions.reminder", "reminder")
+computer_settings            = _lazy_fn("actions.computer_settings", "computer_settings")
+screen_process               = _lazy_fn("actions.screen_processor", "screen_process")
+youtube_video                = _lazy_fn("actions.youtube_video", "youtube_video")
+desktop_control              = _lazy_fn("actions.desktop", "desktop_control")
+browser_control              = _lazy_fn("actions.browser_control", "browser_control")
+file_controller              = _lazy_fn("actions.file_controller", "file_controller")
+code_helper                  = _lazy_fn("actions.code_helper", "code_helper")
+dev_agent                    = _lazy_fn("actions.dev_agent", "dev_agent")
+web_search_action            = _lazy_fn("actions.web_search", "web_search")
+computer_control             = _lazy_fn("actions.computer_control", "computer_control")
+agent_desktop_control        = _lazy_fn("actions.agent_desktop", "agent_desktop_control")
+game_updater                 = _lazy_fn("actions.game_updater", "game_updater")
+self_edit                    = _lazy_fn("actions.self_edit", "self_edit")
+spotify_control              = _lazy_fn("actions.spotify_control", "spotify_control")
+smart_reply                  = _lazy_fn("actions.smart_reply", "smart_reply")
+email_compose                = _lazy_fn("actions.email_compose", "email_compose")
+daily_briefing               = _lazy_fn("actions.daily_briefing", "daily_briefing")
+calendar_manager             = _lazy_fn("actions.calendar_manager", "calendar_manager")
+document_chat                = _lazy_fn("actions.document_chat", "document_chat")
+set_personality              = _lazy_fn("actions.personality_engine", "set_personality")
+get_personality_instruction  = _lazy_fn("actions.personality_engine", "get_personality_instruction")
+camera_control               = _lazy_fn("actions.camera_system", "camera_control")
+davinci_control              = _lazy_fn("actions.davinci_control", "davinci_control")
+auto_edit_video              = _lazy_fn("actions.auto_video_editor", "auto_edit_video")
+davinci_advanced_control     = _lazy_fn("actions.davinci_advanced", "davinci_advanced_control")
+security_shield_control      = _lazy_fn("actions.security_shield", "security_shield_control")
+remote_bridge_control        = _lazy_fn("actions.remote_bridge", "remote_bridge_control")
+read_whatsapp_messages       = _lazy_fn("actions.whatsapp_reader", "read_whatsapp_messages")
+antigravity_coder            = _lazy_fn("actions.antigravity_coder", "antigravity_coder")
+antigravity_ide_control      = _lazy_fn("actions.antigravity_ide_bridge", "antigravity_ide_control")
+call_manager_control         = _lazy_fn("actions.call_manager", "call_manager_control")
+humanizer_tool               = _lazy_fn("core.humanizer", "humanizer_tool")
+universal_file_creator       = _lazy_fn("actions.file_generator", "universal_file_creator")
+exam_companion               = _lazy_fn("actions.exam_companion", "exam_companion")
+deep_research                = _lazy_fn("actions.deep_research", "deep_research")
+college_hub                  = _lazy_fn("actions.college_hub", "college_hub")
+presentation_designer        = _lazy_fn("actions.presentation_designer", "presentation_designer")
+anti_shoulder_surfer_tool    = _lazy_fn("actions.anti_shoulder_surfer", "anti_shoulder_surfer_tool")
+get_anti_shoulder_surfer     = _lazy_fn("actions.anti_shoulder_surfer", "get_anti_shoulder_surfer")
 
 
 
@@ -5444,7 +5390,7 @@ def main():
 
     get_hardware_equilibrium_governor().start_governor(player=ui)
 
-    start_memory_compactor(interval=30.0, threshold_mb=95.0, player=ui)
+    start_memory_compactor(interval=20.0, threshold_mb=68.0, player=ui)
 
 
 

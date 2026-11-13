@@ -14,13 +14,14 @@ def get_api_key():
     except (FileNotFoundError, json.JSONDecodeError):
         return None
 
-try:
-    import chromadb
-    from chromadb import Documents, EmbeddingFunction, Embeddings
-    from google import genai
-except ImportError:
-    chromadb = None
-    genai = None
+def _get_doc_chat_deps():
+    try:
+        import chromadb
+        from google import genai
+        return chromadb, genai
+    except ImportError:
+        return None, None
+
 
 class CustomGeminiEmbeddingFunction:
     def __init__(self, key):
@@ -71,6 +72,7 @@ def read_file(file_path):
     return text, None
 
 def document_chat(parameters: dict, player=None) -> str:
+    chromadb, genai = _get_doc_chat_deps()
     if not chromadb or not genai:
         return "ChromaDB or Google GenAI libraries are not installed, sir."
         

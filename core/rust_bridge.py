@@ -742,16 +742,20 @@ def trim_process_memory() -> dict:
 
 def optimize_hardware() -> List[str]:
     import gc
+    import sys
     import psutil
 
     report = []
-    try:
-        import pyautogui
-        pyautogui.PAUSE = 0.02
-        pyautogui.FAILSAFE = True
-        report.append("UI Macro Engine: Ultra-Low Latency (0.02s pause)")
-    except Exception as e:
-        report.append(f"UI Macro Notice: {e}")
+    if "pyautogui" in sys.modules:
+        try:
+            _pg = sys.modules["pyautogui"]
+            _pg.PAUSE = 0.02
+            _pg.FAILSAFE = True
+            report.append("UI Macro Engine: Ultra-Low Latency (0.02s pause)")
+        except Exception as e:
+            report.append(f"UI Macro Notice: {e}")
+    else:
+        report.append("UI Macro Engine: Lazy-armed (0.02s pause on first input, 0MB idle RAM)")
 
     try:
         bat = psutil.sensors_battery()
@@ -766,16 +770,19 @@ def optimize_hardware() -> List[str]:
     except Exception as e:
         report.append(f"Process Priority Notice: {e}")
 
-    try:
-        import cv2
-        cv2.ocl.setUseOpenCL(True)
-        is_ocl = cv2.ocl.useOpenCL()
-        device_name = "Intel UHD / OpenCL GPU" if is_ocl else "CPU Fallback"
-        report.append(
-            f"OpenCV GPU Acceleration: {'ENABLED (' + device_name + ')' if is_ocl else 'DISABLED'}"
-        )
-    except Exception as e:
-        report.append(f"OpenCV GPU Notice: {e}")
+    if "cv2" in sys.modules:
+        try:
+            _cv2 = sys.modules["cv2"]
+            _cv2.ocl.setUseOpenCL(True)
+            is_ocl = _cv2.ocl.useOpenCL()
+            device_name = "Intel UHD / OpenCL GPU" if is_ocl else "CPU Fallback"
+            report.append(
+                f"OpenCV GPU Acceleration: {'ENABLED (' + device_name + ')' if is_ocl else 'DISABLED'}"
+            )
+        except Exception as e:
+            report.append(f"OpenCV GPU Notice: {e}")
+    else:
+        report.append("OpenCV GPU Acceleration: Lazy-armed (0MB idle RAM until vision active)")
 
     capped, cpu_count = configure_cpu_thread_env()
     report.append(
@@ -791,7 +798,7 @@ def optimize_hardware() -> List[str]:
 
 
 def start_memory_compactor(
-    interval: float = 30.0, threshold_mb: float = 95.0, player=None
+    interval: float = 20.0, threshold_mb: float = 68.0, player=None
 ):
     import os
     import threading
@@ -799,6 +806,17 @@ def start_memory_compactor(
     import psutil
 
     def _compactor_loop():
+        # Post-boot settling pass to return cold startup DLL pages to OS immediately
+        time.sleep(4.0)
+        try:
+            res = trim_process_memory()
+            if res["freed_mb"] > 5.0 and player and hasattr(player, "write_log"):
+                player.write_log(
+                    f"RAM COMPACTOR: Boot trim freed {res['freed_mb']:.1f}MB (Active: {res['current_mb']:.1f}MB)."
+                )
+        except Exception:
+            pass
+
         while True:
             time.sleep(interval)
             try:
@@ -2629,6 +2647,22 @@ def tab_manager(parameters: dict, player=None) -> str:
         return "Unknown tab manager action specified."
     except Exception as e:
         return f"Tab manager encountered an error: {e}"
+
+
+# ---- Phase-8 Zero-Chrome Volumetric Orb Shader Wrapper ----
+def render_volumetric_orb_rgba(
+    size: int = 86,
+    time_sec: float = 0.0,
+    mode: float = 1.0,
+    pulse: float = 0.0,
+) -> Optional[bytes]:
+    if is_rust_active() and hasattr(_rust_core, "render_volumetric_orb_rgba_rust"):
+        return bytes(
+            _rust_core.render_volumetric_orb_rgba_rust(
+                int(size), float(time_sec), float(mode), float(pulse)
+            )
+        )
+    return None
 
 
 

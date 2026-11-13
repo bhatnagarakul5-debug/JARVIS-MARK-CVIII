@@ -13,18 +13,16 @@ from pathlib import Path
 import psutil
 
 from PyQt6.QtCore import (
-    QPoint, QPointF, QRectF, Qt, QTimer, pyqtSignal, QUrl, QUrlQuery,
+    QPoint, QPointF, QRectF, Qt, QTimer, pyqtSignal,
 )
 from PyQt6.QtGui import (
-    QBrush, QColor, QDragEnterEvent, QDropEvent, QFont,
+    QBrush, QColor, QDragEnterEvent, QDropEvent, QFont, QImage,
     QKeySequence, QLinearGradient, QPainter, QPen, QRadialGradient, QRegion, QShortcut,
 )
 from PyQt6.QtWidgets import (
     QApplication, QFileDialog, QFrame, QHBoxLayout, QLabel, QLineEdit,
     QMainWindow, QPushButton, QTextEdit, QVBoxLayout, QWidget,
 )
-from PyQt6.QtWebEngineWidgets import QWebEngineView
-from PyQt6.QtWebEngineCore import QWebEnginePage
 
 
 def _base_dir() -> Path:
@@ -383,64 +381,122 @@ user32 = ctypes.windll.user32
 
 class NativeOrbCore(QWidget):
     """
-    Exact Prototype 3D Raymarched Holographic Shader Orb.
-    100% matches the user prototype: 3D living plasma, cobalt-cyan radiance,
-    state-reactive color transitions, masked to a pure 86x86 circle with 0 rectangular fillers.
+    Zero-Chrome 3D Raymarched Holographic Shader Orb powered by `jarvis_rust_core`.
+    Renders the volumetric 28-step plasma shader natively via Rust + Rayon into a
+    29 KB RGBA QImage buffer (eliminating QtWebEngine / Chromium child processes),
+    masked to a pure 86x86 circle with adaptive FPS control.
     """
     clicked = pyqtSignal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setFixedSize(86, 86)
+        self._size = 86
+        self.setFixedSize(self._size, self._size)
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
-        self.setMask(QRegion(0, 0, 86, 86, QRegion.RegionType.Ellipse))
+        self.setMask(QRegion(0, 0, self._size, self._size, QRegion.RegionType.Ellipse))
 
         self.state = "LISTENING"
         self.war_mode = False
+        self._mode_num = 1.0
+        self._pulse_val = 0.0
+        self._start_t = time.perf_counter()
+        self._fps = 30
+        self._rgba_buf: bytes | None = None
+        self._frame_img: QImage | None = None
 
-        self._web = QWebEngineView(self)
-        self._web.setFixedSize(86, 86)
-        self._web.setStyleSheet("background: transparent;")
-        self._web.page().setBackgroundColor(QColor(0, 0, 0, 0))
-        # Pass all mouse events directly to parent for native dragging & clicking
-        self._web.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
-        self._web.setMask(QRegion(0, 0, 86, 86, QRegion.RegionType.Ellipse))
+        self._anim_timer = QTimer(self)
+        self._anim_timer.timeout.connect(self._tick)
+        self._anim_timer.start(int(1000 / self._fps))
+        self._tick()
 
-        if ORB_CORE_HTML_PATH.exists():
-            self._web.load(QUrl.fromLocalFile(str(ORB_CORE_HTML_PATH.resolve())))
+    def _sync_mode_num(self):
+        if self.war_mode:
+            self._mode_num = 5.0
+        elif self.state in ("THINKING", "PILOTING", "WORKING"):
+            self._mode_num = 2.0
+        elif self.state == "SPEAKING":
+            self._mode_num = 3.0
+        elif self.state == "MUTED":
+            self._mode_num = 4.0
         else:
-            self._web.setHtml(ORB_CORE_HTML)
+            self._mode_num = 1.0
+
+    def _tick(self):
+        if self._pulse_val > 0.0:
+            self._pulse_val = max(0.0, self._pulse_val - 0.04)
+        elapsed = time.perf_counter() - self._start_t
+        try:
+            from core.rust_bridge import render_volumetric_orb_rgba
+            rgba = render_volumetric_orb_rgba(
+                self._size, elapsed, self._mode_num, self._pulse_val
+            )
+            if rgba:
+                self._rgba_buf = rgba
+                self._frame_img = QImage(
+                    self._rgba_buf,
+                    self._size,
+                    self._size,
+                    self._size * 4,
+                    QImage.Format.Format_RGBA8888,
+                )
+        except Exception:
+            pass
+        self.update()
+
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        if self._frame_img is not None:
+            painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
+            painter.drawImage(0, 0, self._frame_img)
+            return
+
+        # Pure Qt fallback if Rust extension unavailable
+        palette = {
+            5.0: (QColor(255, 38, 64), QColor(128, 3, 13, 180)),
+            2.0: (QColor(191, 51, 255), QColor(64, 5, 178, 180)),
+            4.0: (QColor(255, 46, 89), QColor(102, 5, 20, 180)),
+        }
+        fg, bg = palette.get(self._mode_num, (QColor(0, 229, 255), QColor(5, 56, 217, 180)))
+        grad = QRadialGradient(self._size / 2, self._size / 2, self._size / 2)
+        grad.setColorAt(0.0, QColor(235, 252, 255, 240))
+        grad.setColorAt(0.45, fg)
+        grad.setColorAt(0.85, bg)
+        grad.setColorAt(1.0, QColor(0, 0, 0, 0))
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.setBrush(QBrush(grad))
+        painter.drawEllipse(2, 2, self._size - 4, self._size - 4)
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        if not self._anim_timer.isActive():
+            self._anim_timer.start(max(16, int(1000 / max(1, self._fps))))
+
+    def hideEvent(self, event):
+        if self._anim_timer.isActive():
+            self._anim_timer.stop()
+        super().hideEvent(event)
+
+    def set_fps(self, fps: int):
+        clamped = max(1, min(60, int(fps)))
+        if clamped != self._fps:
+            self._fps = clamped
+            if self._anim_timer.isActive():
+                self._anim_timer.setInterval(max(16, int(1000 / clamped)))
 
     def set_state(self, st: str):
         self.state = (st or "LISTENING").upper()
-        if self.war_mode:
-            mode_num = 5.0
-        elif self.state in ("THINKING", "PILOTING", "WORKING"):
-            mode_num = 2.0
-        elif self.state == "SPEAKING":
-            mode_num = 3.0
-        elif self.state == "MUTED":
-            mode_num = 4.0
-        else:
-            mode_num = 1.0
-        try:
-            self._web.page().runJavaScript(f"window.setShaderMode && window.setShaderMode({mode_num});")
-        except Exception:
-            pass
+        self._sync_mode_num()
+        self._tick()
 
     def set_war_mode(self, w: bool):
         self.war_mode = bool(w)
-        mode_num = 5.0 if self.war_mode else 1.0
-        try:
-            self._web.page().runJavaScript(f"window.setShaderMode && window.setShaderMode({mode_num});")
-        except Exception:
-            pass
+        self._sync_mode_num()
+        self._tick()
 
     def trigger_pulse(self):
-        try:
-            self._web.page().runJavaScript("window.triggerShaderPulse && window.triggerShaderPulse();")
-        except Exception:
-            pass
+        self._pulse_val = 1.0
+        self._tick()
 
 
 class HolographicOrbWindow(QMainWindow):
@@ -821,7 +877,8 @@ class HolographicOrbWindow(QMainWindow):
         pass
 
     def set_hud_fps(self, fps: int):
-        pass
+        if hasattr(self, "_orb") and hasattr(self._orb, "set_fps"):
+            self._orb.set_fps(fps)
 
     def _switch_to_blade(self):
         if callable(self.on_switch_mode):
@@ -1518,7 +1575,8 @@ class MainWindow(QMainWindow):
         pass
 
     def set_hud_fps(self, fps: int):
-        pass
+        if hasattr(self, "_orb") and hasattr(self._orb, "set_fps"):
+            self._orb.set_fps(fps)
 
     def set_war_theme(self, enabled: bool):
         self._war_mode = bool(enabled)

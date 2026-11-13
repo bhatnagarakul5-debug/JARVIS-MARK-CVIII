@@ -17,7 +17,6 @@ from typing import Optional, List, Dict, Any
 import send2trash
 import urllib.request
 import urllib.parse
-from PIL import Image
 
 ACTIVE_DOC_STATE_FILE = Path(__file__).resolve().parent.parent / "config" / "last_active_document.json"
 
@@ -1108,6 +1107,7 @@ def fetch_or_download_graph_image(query: str, target_dir: Optional[Path] = None)
                 with urllib.request.urlopen(dl_req, timeout=10) as dl_resp:
                     data = dl_resp.read()
                     if len(data) > 3000:
+                        from PIL import Image
                         dest_file.write_bytes(data)
                         with Image.open(dest_file) as im:
                             w, h = im.size
