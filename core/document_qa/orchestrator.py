@@ -9,7 +9,7 @@ from typing import Dict, Any, Optional, Tuple, List
 from datetime import datetime
 
 from core.document_qa.models import DocumentCategory, QAStatus, QualityScorecard
-from core.document_qa.classifier import classify_document_request
+from core.rust_bridge import classify_document_request
 from core.document_qa.qa_engine import DocumentQAEngine
 from core.document_qa.config import get_qa_config
 from core.ai_client import generate_text_with_retry

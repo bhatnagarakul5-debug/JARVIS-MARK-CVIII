@@ -622,7 +622,7 @@ class IntegritySeal:
         "main.py",
         "ui.py",
         "core/server_security.py",
-        "core/hardware_optimizer.py",
+        "core/rust_bridge.py",
         "core/emotional_spectrum.py",
         "actions/remote_bridge.py"
     ]

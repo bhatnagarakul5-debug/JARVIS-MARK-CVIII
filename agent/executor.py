@@ -173,7 +173,7 @@ def _call_tool(tool: str, parameters: dict, speak: Callable | None) -> str:
         return youtube_video(parameters=parameters, player=None) or "Done."
 
     elif tool == "weather_report":
-        from actions.weather_report import weather_action
+        from core.rust_bridge import weather_action
         return weather_action(parameters=parameters, player=None) or "Done."
 
     elif tool == "computer_settings":

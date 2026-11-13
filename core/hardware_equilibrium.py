@@ -12,7 +12,7 @@ import subprocess
 import threading
 import psutil
 import urllib.request
-from core.hardware_optimizer import trim_process_memory
+from core.rust_bridge import trim_process_memory
 
 # Operating System identification
 _OS = sys.platform

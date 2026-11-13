@@ -670,7 +670,7 @@ class TelegramRemoteBridge:
         # 📝 Clipboard Control (/clip, /clip <text>)
         elif cmd_low.startswith("/clip") or cmd_low.startswith("clip"):
             parts = cmd.split(" ", 1)
-            from actions.clipboard_manager import clipboard_manager
+            from core.rust_bridge import clipboard_manager
             if len(parts) > 1 and parts[1].strip():
                 txt_val = parts[1].strip()
                 import pyperclip

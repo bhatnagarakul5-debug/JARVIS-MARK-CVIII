@@ -15,7 +15,7 @@ from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeou
 from pathlib import Path
 
 try:
-    from actions.weather_report import weather_action
+    from core.rust_bridge import weather_action
 except ImportError:
     weather_action = None
 

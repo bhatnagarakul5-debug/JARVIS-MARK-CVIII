@@ -58,7 +58,7 @@ def execute_voice_macro(parameters: dict, player=None) -> str:
 
         # 4. Start 45-minute Focus Mode
         try:
-            from actions.focus_mode import focus_mode
+            from core.rust_bridge import focus_mode
             focus_mode({"action": "start", "duration": 45}, player=player)
         except Exception:
             pass

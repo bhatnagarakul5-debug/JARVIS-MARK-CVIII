@@ -29,11 +29,11 @@ from core.document_qa.models import (
     IssueSeverity, QAStatus, SourceEvidence, Claim, ValidationIssue,
     QualityScorecard
 )
-from core.document_qa.classifier import classify_document_request
+from core.rust_bridge import classify_document_request
 from core.document_qa.evidence_registry import EvidenceRegistry
-from core.document_qa.claim_verifier import ClaimVerifier
-from core.document_qa.math_validator import MathValidator
-from core.document_qa.citation_engine import CitationEngine
+from core.rust_bridge import ClaimVerifier
+from core.rust_bridge import MathValidator
+from core.rust_bridge import CitationEngine
 from core.document_qa.qa_engine import DocumentQAEngine
 from core.document_qa.post_render_inspectors import (
     DocxQualityInspector, PdfQualityInspector, XlsxQualityInspector,

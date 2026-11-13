@@ -13,9 +13,7 @@ from core.document_qa.models import (
 )
 from core.document_qa.config import get_qa_config
 from core.document_qa.evidence_registry import EvidenceRegistry
-from core.document_qa.claim_verifier import ClaimVerifier
-from core.document_qa.math_validator import MathValidator
-from core.document_qa.citation_engine import CitationEngine
+from core.rust_bridge import ClaimVerifier, MathValidator, CitationEngine
 from core.document_qa.post_render_inspectors import (
     DocxQualityInspector, PdfQualityInspector, XlsxQualityInspector,
     PptxQualityInspector, HtmlQualityInspector, MarkdownQualityInspector

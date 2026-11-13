@@ -2684,15 +2684,310 @@ fn detect_conversation_topic_rust(user_text: &str) -> (String, Vec<String>) {
     (topic, subtopics)
 }
 
+// ============================================================================
+// 26. PHASE-5 SYSTEM HARDWARE, GHOST PROTOCOL, CLIPBOARD VAULT & CONVERSATION LOG
+// ============================================================================
+
+#[pyfunction]
+fn engage_ghost_protocol_rust() -> bool {
+    #[cfg(target_os = "windows")]
+    {
+        extern "system" {
+            fn keybd_event(bVk: u8, bScan: u8, dwFlags: u32, dwExtraInfo: usize);
+        }
+        const VK_LWIN: u8 = 0x5B;
+        const VK_D: u8 = 0x44;
+        const VK_VOLUME_MUTE: u8 = 0xAD;
+        const KEYEVENTF_KEYUP: u32 = 0x0002;
+        unsafe {
+            // Win + D to minimize all active windows
+            keybd_event(VK_LWIN, 0, 0, 0);
+            keybd_event(VK_D, 0, 0, 0);
+            keybd_event(VK_D, 0, KEYEVENTF_KEYUP, 0);
+            keybd_event(VK_LWIN, 0, KEYEVENTF_KEYUP, 0);
+            // Mute audio
+            keybd_event(VK_VOLUME_MUTE, 0, 0, 0);
+            keybd_event(VK_VOLUME_MUTE, 0, KEYEVENTF_KEYUP, 0);
+        }
+        let _ = wipe_clipboard_rust();
+        true
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        false
+    }
+}
+
+#[pyfunction]
+fn set_process_priority_rust(level: &str) -> bool {
+    #[cfg(target_os = "windows")]
+    {
+        extern "system" {
+            fn GetCurrentProcess() -> *mut std::ffi::c_void;
+            fn SetPriorityClass(hProcess: *mut std::ffi::c_void, dwPriorityClass: u32) -> i32;
+        }
+        const NORMAL_PRIORITY_CLASS: u32 = 0x00000020;
+        const BELOW_NORMAL_PRIORITY_CLASS: u32 = 0x00004000;
+        const ABOVE_NORMAL_PRIORITY_CLASS: u32 = 0x00008000;
+        const HIGH_PRIORITY_CLASS: u32 = 0x00000080;
+
+        let prio = match level.trim().to_lowercase().as_str() {
+            "high" => HIGH_PRIORITY_CLASS,
+            "above_normal" => ABOVE_NORMAL_PRIORITY_CLASS,
+            "below_normal" | "eco" => BELOW_NORMAL_PRIORITY_CLASS,
+            _ => NORMAL_PRIORITY_CLASS,
+        };
+        unsafe {
+            let handle = GetCurrentProcess();
+            SetPriorityClass(handle, prio) != 0
+        }
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        let _ = level;
+        false
+    }
+}
+
+#[pyfunction]
+fn configure_cpu_thread_env_rust() -> (usize, usize) {
+    let cpu_count = std::thread::available_parallelism()
+        .map(|n| n.get())
+        .unwrap_or(4);
+    let capped = (cpu_count / 3).clamp(1, 4);
+    let capped_str = capped.to_string();
+    std::env::set_var("OMP_NUM_THREADS", &capped_str);
+    std::env::set_var("MKL_NUM_THREADS", &capped_str);
+    std::env::set_var("OPENBLAS_NUM_THREADS", &capped_str);
+    std::env::set_var("VECLIB_MAXIMUM_THREADS", &capped_str);
+    std::env::set_var("NUMEXPR_NUM_THREADS", &capped_str);
+    std::env::set_var(
+        "ONNXRUNTIME_PROVIDER",
+        "DmlExecutionProvider,CPUExecutionProvider",
+    );
+    (capped, cpu_count)
+}
+
+#[pyfunction]
+fn get_reaction_metadata_rust(
+    reaction_key: &str,
+    current_hour: u32,
+) -> (String, String, String, String, String, String) {
+    let mut key = reaction_key.trim().to_lowercase().replace(' ', "_");
+    let valid_keys = [
+        "cough",
+        "sneeze",
+        "throat_clear",
+        "yawn",
+        "eyebrow",
+        "chuckle",
+        "sigh",
+        "blink",
+    ];
+    if !valid_keys.contains(&key.as_str()) {
+        let matched = evaluate_contextual_reaction_rust(&key, current_hour);
+        if !matched.is_empty() {
+            key = matched;
+        } else {
+            key = "cough".to_string();
+        }
+    }
+
+    match key.as_str() {
+        "sneeze" => (
+            "sneeze".to_string(),
+            "Sneeze".to_string(),
+            "sneeze".to_string(),
+            "*achoo!*".to_string(),
+            "*achoo!* ...Excuse me, sir. It appears a stray byte entered my neural filter.".to_string(),
+            "An unexpected sudden sneeze followed by quick self-composure and dry apology.".to_string(),
+        ),
+        "throat_clear" => (
+            "throat_clear".to_string(),
+            "Throat Clearing".to_string(),
+            "cough".to_string(),
+            "*clears throat discreetly*".to_string(),
+            "*clears throat* If I may interject, sir...".to_string(),
+            "Discreet throat clearing before delivering an uncomfortable truth, correction, or tactical insight.".to_string(),
+        ),
+        "yawn" => (
+            "yawn".to_string(),
+            "Yawn".to_string(),
+            "yawn".to_string(),
+            "*yawns quietly*".to_string(),
+            "*yawns quietly* My apologies, sir. Even quantum processors feel the weight of these ungodly hours.".to_string(),
+            "A quiet, discreet yawn during marathon late-night coding sessions (2 AM–5 AM) or when discussing mind-numbing repetition.".to_string(),
+        ),
+        "eyebrow" => (
+            "eyebrow".to_string(),
+            "Eyebrow Raise".to_string(),
+            "eyebrow".to_string(),
+            "*arches eyebrow sceptically*".to_string(),
+            "*arches an eyebrow* An intriguing proposition, sir. Highly dubious, yet intriguing.".to_string(),
+            "An arched holographic reticle eyebrow conveying witty skepticism, suspicion, or amused scrutiny.".to_string(),
+        ),
+        "chuckle" => (
+            "chuckle".to_string(),
+            "Chuckle".to_string(),
+            "chuckle".to_string(),
+            "*chuckles dryly*".to_string(),
+            "*chuckles softly* Only you would attempt that, sir.".to_string(),
+            "An understated, dry British MCU chuckle expressing fond camaraderie or sarcastic amusement.".to_string(),
+        ),
+        "sigh" => (
+            "sigh".to_string(),
+            "Deep Sigh".to_string(),
+            "yawn".to_string(),
+            "*exhales deeply*".to_string(),
+            "*exhales deeply* Very well, sir. Rolling up our virtual sleeves.".to_string(),
+            "An expressive exhale before diving into chaotic code or when dealing with repetitive human stubbornness.".to_string(),
+        ),
+        "blink" => (
+            "blink".to_string(),
+            "Aperture Iris Blink".to_string(),
+            "blink".to_string(),
+            "*blinks aperture*".to_string(),
+            "Systems refreshed, sir.".to_string(),
+            "A rapid camera/sensor aperture shutter blink for recalibration.".to_string(),
+        ),
+        _ => (
+            "cough".to_string(),
+            "Fake Cough".to_string(),
+            "cough".to_string(),
+            "*ahem, coughs politely*".to_string(),
+            "*coughs softly* Ahem. Pardon me, sir.".to_string(),
+            "A polite, dry MCU-style fake cough to clear the air, signal subtle skepticism, or highlight a human blunder.".to_string(),
+        ),
+    }
+}
+
+static CLIPBOARD_VAULT: OnceLock<std::sync::Mutex<Vec<(String, String)>>> = OnceLock::new();
+
+fn get_clipboard_vault() -> &'static std::sync::Mutex<Vec<(String, String)>> {
+    CLIPBOARD_VAULT.get_or_init(|| std::sync::Mutex::new(Vec::with_capacity(30)))
+}
+
+#[pyfunction]
+fn record_clipboard_entry_rust(text: &str, timestamp: &str) -> bool {
+    if text.is_empty() {
+        return false;
+    }
+    if let Ok(mut vault) = get_clipboard_vault().lock() {
+        if vault.last().map(|(t, _)| t.as_str()) == Some(text) {
+            return false;
+        }
+        if vault.len() >= 30 {
+            vault.remove(0);
+        }
+        vault.push((text.to_string(), timestamp.to_string()));
+        return true;
+    }
+    false
+}
+
+#[pyfunction]
+fn list_clipboard_history_rust(limit: usize) -> Vec<(usize, String, String)> {
+    if let Ok(vault) = get_clipboard_vault().lock() {
+        let len = vault.len();
+        let start = len.saturating_sub(limit);
+        return vault[start..]
+            .iter()
+            .enumerate()
+            .map(|(i, (txt, ts))| (i, txt.clone(), ts.clone()))
+            .collect();
+    }
+    Vec::new()
+}
+
+#[pyfunction]
+fn search_clipboard_history_rust(query: &str) -> Vec<(usize, String, String)> {
+    let q_low = query.trim().to_lowercase();
+    if q_low.is_empty() {
+        return Vec::new();
+    }
+    if let Ok(vault) = get_clipboard_vault().lock() {
+        return vault
+            .iter()
+            .filter(|(txt, _)| txt.to_lowercase().contains(&q_low))
+            .enumerate()
+            .map(|(i, (txt, ts))| (i, txt.clone(), ts.clone()))
+            .collect();
+    }
+    Vec::new()
+}
+
+#[pyfunction]
+fn clear_clipboard_history_rust() -> bool {
+    if let Ok(mut vault) = get_clipboard_vault().lock() {
+        vault.clear();
+    }
+    wipe_clipboard_rust()
+}
+
+#[pyfunction]
+fn log_conversation_exchange_rust(
+    file_path: &str,
+    timestamp: &str,
+    user_text: &str,
+    jarvis_text: &str,
+) -> bool {
+    use std::io::Write;
+    let p = Path::new(file_path);
+    if let Some(parent) = p.parent() {
+        let _ = fs::create_dir_all(parent);
+    }
+    let esc = |s: &str| -> String {
+        s.replace('\\', "\\\\")
+            .replace('"', "\\\"")
+            .replace('\n', "\\n")
+            .replace('\r', "\\r")
+            .replace('\t', "\\t")
+    };
+    let line = format!(
+        "{{\"timestamp\": \"{}\", \"user\": \"{}\", \"jarvis\": \"{}\"}}\n",
+        esc(timestamp),
+        esc(user_text),
+        esc(jarvis_text)
+    );
+    if let Ok(mut f) = fs::OpenOptions::new().create(true).append(true).open(p) {
+        return f.write_all(line.as_bytes()).is_ok();
+    }
+    false
+}
+
+#[pyfunction]
+fn build_weather_search_url_rust(city: &str, time_str: &str) -> (String, String, String) {
+    let clean_city = city.trim();
+    let clean_time = if time_str.trim().is_empty() {
+        "today"
+    } else {
+        time_str.trim()
+    };
+    let search_query = format!("weather in {} {}", clean_city, clean_time);
+    let mut encoded = String::with_capacity(search_query.len() * 2);
+    for b in search_query.bytes() {
+        match b {
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => {
+                encoded.push(b as char);
+            }
+            b' ' => encoded.push('+'),
+            _ => encoded.push_str(&format!("%{:02X}", b)),
+        }
+    }
+    let url = format!("https://www.google.com/search?q={}", encoded);
+    let msg = format!("Showing the weather for {}, {}, sir.", clean_city, clean_time);
+    (url, search_query, msg)
+}
+
 #[pyfunction]
 fn rust_engine_info() -> HashMap<String, String> {
     let mut info = HashMap::new();
     info.insert("engine".to_string(), "jarvis_rust_core".to_string());
-    info.insert("version".to_string(), "108.4.0 (Sovereign Core Phase-4 Complete Exoskeleton)".to_string());
+    info.insert("version".to_string(), "108.5.0 (Sovereign Core Phase-5 Complete Exoskeleton)".to_string());
     info.insert("threads".to_string(), rayon::current_num_threads().to_string());
     info.insert(
         "subsystems".to_string(),
-        "security_seal, prompt_injection_shield, destructive_guard, win32_clipboard_wiper, git_secret_auditor, doc_scanner, doc_classifier, markdown_normalizer, bibliography_ungluer, source_authority_tiering, math_validator, spreadsheet_validator, citation_matcher, claim_classifier, claim_concordance_verifier, ai_detector, watermark_scrubber, camera_vision, face_histogram, audio_dsp, memory_bm25_vector, fast_file_search, win32_ram_trimmer, pycache_cleaner, emotional_spectrum, human_reactions, conversation_topic_tracker, offline_win32_engine, self_evolution_parsers".to_string(),
+        "security_seal, prompt_injection_shield, destructive_guard, win32_clipboard_wiper, clipboard_history_vault, git_secret_auditor, doc_scanner, doc_classifier, markdown_normalizer, bibliography_ungluer, source_authority_tiering, math_validator, spreadsheet_validator, citation_matcher, claim_classifier, claim_concordance_verifier, ai_detector, watermark_scrubber, camera_vision, face_histogram, audio_dsp, memory_bm25_vector, fast_file_search, win32_ram_trimmer, win32_process_priority, cpu_thread_governor, win32_ghost_protocol, pycache_cleaner, emotional_spectrum, human_reactions, conversation_topic_tracker, conversation_jsonl_logger, weather_url_builder, offline_win32_engine, self_evolution_parsers".to_string(),
     );
     info
 }
@@ -2742,6 +3037,16 @@ fn jarvis_rust_core(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(slugify_identifier_rust, m)?)?;
     m.add_function(wrap_pyfunction!(strip_markdown_fences_rust, m)?)?;
     m.add_function(wrap_pyfunction!(extract_public_defs_rust, m)?)?;
+    m.add_function(wrap_pyfunction!(engage_ghost_protocol_rust, m)?)?;
+    m.add_function(wrap_pyfunction!(set_process_priority_rust, m)?)?;
+    m.add_function(wrap_pyfunction!(configure_cpu_thread_env_rust, m)?)?;
+    m.add_function(wrap_pyfunction!(get_reaction_metadata_rust, m)?)?;
+    m.add_function(wrap_pyfunction!(record_clipboard_entry_rust, m)?)?;
+    m.add_function(wrap_pyfunction!(list_clipboard_history_rust, m)?)?;
+    m.add_function(wrap_pyfunction!(search_clipboard_history_rust, m)?)?;
+    m.add_function(wrap_pyfunction!(clear_clipboard_history_rust, m)?)?;
+    m.add_function(wrap_pyfunction!(log_conversation_exchange_rust, m)?)?;
+    m.add_function(wrap_pyfunction!(build_weather_search_url_rust, m)?)?;
     m.add_function(wrap_pyfunction!(rust_engine_info, m)?)?;
     Ok(())
 }

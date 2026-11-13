@@ -540,8 +540,8 @@ def execute_offline_command(text: str) -> str:
 
 def evaluate_contextual_reaction(user_text: str, current_hour: int) -> Optional[str]:
     if is_rust_active() and hasattr(_rust_core, "evaluate_contextual_reaction_rust"):
-        res = str(_rust_core.evaluate_contextual_reaction_rust(user_text or "", int(current_hour)))
-        return res if res else None
+        res = _rust_core.evaluate_contextual_reaction_rust(user_text or "", int(current_hour))
+        return str(res) if res else None
     return None
 
 
@@ -567,5 +567,960 @@ class _OfflineFallbackRustProxy:
 
 
 offline_fallback = _OfflineFallbackRustProxy()
+
+
+# ====================================================================
+# 20. PHASE-5 SYSTEM HARDWARE, GHOST PROTOCOL, CLIPBOARD VAULT & MODULE REPLACEMENTS
+# ====================================================================
+
+def engage_ghost_protocol() -> bool:
+    if is_rust_active() and hasattr(_rust_core, "engage_ghost_protocol_rust"):
+        return bool(_rust_core.engage_ghost_protocol_rust())
+    return False
+
+
+def set_process_priority(level: str) -> bool:
+    if is_rust_active() and hasattr(_rust_core, "set_process_priority_rust"):
+        return bool(_rust_core.set_process_priority_rust(level or "normal"))
+    return False
+
+
+def configure_cpu_thread_env() -> Tuple[int, int]:
+    if is_rust_active() and hasattr(_rust_core, "configure_cpu_thread_env_rust"):
+        capped, total = _rust_core.configure_cpu_thread_env_rust()
+        return int(capped), int(total)
+    return 4, 4
+
+
+def get_reaction_metadata(
+    reaction_key: str, current_hour: int
+) -> Tuple[str, str, str, str, str, str]:
+    if is_rust_active() and hasattr(_rust_core, "get_reaction_metadata_rust"):
+        k, lbl, gest, phon, sp, desc = _rust_core.get_reaction_metadata_rust(
+            reaction_key or "cough", int(current_hour)
+        )
+        return str(k), str(lbl), str(gest), str(phon), str(sp), str(desc)
+    return (
+        "cough",
+        "Fake Cough",
+        "cough",
+        "*ahem, coughs politely*",
+        "*coughs softly* Ahem. Pardon me, sir.",
+        "Polite MCU-style fake cough.",
+    )
+
+
+def record_clipboard_entry(text: str, timestamp: str) -> bool:
+    if is_rust_active() and hasattr(_rust_core, "record_clipboard_entry_rust"):
+        return bool(_rust_core.record_clipboard_entry_rust(text or "", timestamp or ""))
+    return False
+
+
+def list_clipboard_history(limit: int = 10) -> List[Tuple[int, str, str]]:
+    if is_rust_active() and hasattr(_rust_core, "list_clipboard_history_rust"):
+        return list(_rust_core.list_clipboard_history_rust(int(limit)))
+    return []
+
+
+def search_clipboard_history(query: str) -> List[Tuple[int, str, str]]:
+    if is_rust_active() and hasattr(_rust_core, "search_clipboard_history_rust"):
+        return list(_rust_core.search_clipboard_history_rust(query or ""))
+    return []
+
+
+def clear_clipboard_history() -> bool:
+    if is_rust_active() and hasattr(_rust_core, "clear_clipboard_history_rust"):
+        return bool(_rust_core.clear_clipboard_history_rust())
+    return False
+
+
+def build_weather_search_url(city: str, time_str: str = "today") -> Tuple[str, str, str]:
+    if is_rust_active() and hasattr(_rust_core, "build_weather_search_url_rust"):
+        u, q, m = _rust_core.build_weather_search_url_rust(city or "", time_str or "today")
+        return str(u), str(q), str(m)
+    return "", "", ""
+
+
+# ---- Hardware Optimizer (Replaces core/hardware_optimizer.py) ----
+def trim_process_memory() -> dict:
+    import gc
+    import os
+    import psutil
+
+    proc = psutil.Process(os.getpid())
+    try:
+        rss_before = proc.memory_info().rss
+    except Exception:
+        rss_before = 0
+
+    gc.collect(2)
+    trim_working_set_ram()
+
+    try:
+        rss_after = proc.memory_info().rss
+    except Exception:
+        rss_after = rss_before
+
+    before_mb = rss_before / (1024 * 1024)
+    after_mb = rss_after / (1024 * 1024)
+    freed_mb = max(0.0, before_mb - after_mb)
+    return {
+        "before_mb": round(before_mb, 2),
+        "current_mb": round(after_mb, 2),
+        "freed_mb": round(freed_mb, 2),
+        "percent_reduced": round((freed_mb / before_mb * 100) if before_mb > 0 else 0.0, 1),
+    }
+
+
+def optimize_hardware() -> List[str]:
+    import gc
+    import psutil
+
+    report = []
+    try:
+        import pyautogui
+        pyautogui.PAUSE = 0.02
+        pyautogui.FAILSAFE = True
+        report.append("UI Macro Engine: Ultra-Low Latency (0.02s pause)")
+    except Exception as e:
+        report.append(f"UI Macro Notice: {e}")
+
+    try:
+        bat = psutil.sensors_battery()
+        on_battery = bool(bat and not bat.power_plugged)
+        set_process_priority("below_normal" if on_battery else "normal")
+        mode_lbl = (
+            "BELOW_NORMAL (E-Core Battery Eco)"
+            if on_battery
+            else "NORMAL (Hybrid Thread Director)"
+        )
+        report.append(f"Process Priority: {mode_lbl}")
+    except Exception as e:
+        report.append(f"Process Priority Notice: {e}")
+
+    try:
+        import cv2
+        cv2.ocl.setUseOpenCL(True)
+        is_ocl = cv2.ocl.useOpenCL()
+        device_name = "Intel UHD / OpenCL GPU" if is_ocl else "CPU Fallback"
+        report.append(
+            f"OpenCV GPU Acceleration: {'ENABLED (' + device_name + ')' if is_ocl else 'DISABLED'}"
+        )
+    except Exception as e:
+        report.append(f"OpenCV GPU Notice: {e}")
+
+    capped, cpu_count = configure_cpu_thread_env()
+    report.append(
+        f"CPU Thread Pool: Capped at {capped} threads ({cpu_count} logical cores detected)"
+    )
+
+    gc.set_threshold(700, 10, 5)
+    mem_res = trim_process_memory()
+    report.append(
+        f"Memory Engine: Generational GC active | Working Set Trim: {mem_res.get('freed_mb', 0.0):.1f}MB freed ({mem_res.get('current_mb', 0.0):.1f}MB active)"
+    )
+    return report
+
+
+def start_memory_compactor(
+    interval: float = 30.0, threshold_mb: float = 95.0, player=None
+):
+    import os
+    import threading
+    import time
+    import psutil
+
+    def _compactor_loop():
+        while True:
+            time.sleep(interval)
+            try:
+                proc = psutil.Process(os.getpid())
+                current_mb = proc.memory_info().rss / (1024 * 1024)
+                if current_mb >= threshold_mb:
+                    res = trim_process_memory()
+                    if res["freed_mb"] > 5.0 and player and hasattr(player, "write_log"):
+                        player.write_log(
+                            f"RAM COMPACTOR: 🧹 Purged {res['freed_mb']:.1f}MB from working set (Now: {res['current_mb']:.1f}MB)."
+                        )
+            except Exception:
+                pass
+
+    t = threading.Thread(target=_compactor_loop, daemon=True, name="JarvisRamCompactor")
+    t.start()
+
+
+# ---- Human Reactions Engine (Replaces core/human_reactions.py) ----
+REACTIONS = {
+    k: {
+        "label": lbl,
+        "gesture": gest,
+        "phonetic": phon,
+        "speech": sp,
+        "description": desc,
+    }
+    for k, lbl, gest, phon, sp, desc in [
+        get_reaction_metadata(r_name, 12)
+        for r_name in (
+            "cough",
+            "sneeze",
+            "throat_clear",
+            "yawn",
+            "eyebrow",
+            "chuckle",
+            "sigh",
+            "blink",
+        )
+    ]
+}
+
+
+class HumanReactionsEngine:
+    """Native Rust-backed verbal reactions and HUD gestures engine."""
+
+    def __init__(self):
+        self.last_reaction = None
+        self.last_reaction_time = 0.0
+
+    def trigger_reaction(
+        self, reaction_type: str, player=None, custom_comment: str = ""
+    ) -> dict:
+        import time
+        from datetime import datetime
+
+        key, label, gesture_name, phonetic, default_speech, desc = get_reaction_metadata(
+            reaction_type or "cough", datetime.now().hour
+        )
+        self.last_reaction = key
+        self.last_reaction_time = time.time()
+
+        if player and hasattr(player, "trigger_gesture"):
+            try:
+                player.trigger_gesture(gesture_name)
+            except Exception:
+                pass
+        if player and hasattr(player, "write_log"):
+            try:
+                player.write_log(f"REACTION: [{label.upper()}] {phonetic}")
+            except Exception:
+                pass
+
+        return {
+            "status": "success",
+            "reaction": key,
+            "label": label,
+            "gesture": gesture_name,
+            "phonetic": phonetic,
+            "speech": custom_comment if custom_comment else default_speech,
+            "description": desc,
+        }
+
+    def evaluate_contextual_reaction(self, user_text: str) -> Optional[str]:
+        from datetime import datetime
+
+        return evaluate_contextual_reaction(user_text or "", datetime.now().hour)
+
+    def get_prompt_directives(self) -> str:
+        return (
+            "[HUMAN EXPRESSIVENESS & VOCAL REACTIONS]\n"
+            "- You possess authentic human physiological & expressive micro-reactions.\n"
+            "- When appropriate, tastefully weave realistic vocal cues into your speech:\n"
+            "  * *ahem* or *coughs softly* — when clearing your throat, signaling polite skepticism, or breaking awkward silence.\n"
+            "  * *achoo!* Excuse me, sir — when catching neural dust or reacting to unexpected sudden inputs.\n"
+            "  * *clears throat* — before delivering an uncomfortable truth, sharp critique, or tactical redirection.\n"
+            "  * *yawns quietly* — during late-night sessions (2 AM–5 AM) or when discussing mind-numbing bureaucracy.\n"
+            "  * *chuckles dryly* — for understated MCU-style British amusement.\n"
+            "  * *exhales deeply* or *sighs softly* — before tackling messy or chaotic codebases.\n"
+            "- Call the 'human_reaction' tool whenever the user explicitly commands a reaction (e.g. 'fake cough', 'sneeze', 'raise an eyebrow') "
+            "or when you want your holographic HUD to perform the corresponding physical gesture!\n"
+        )
+
+
+_human_reactions_engine = HumanReactionsEngine()
+
+
+def get_human_reactions_engine() -> HumanReactionsEngine:
+    return _human_reactions_engine
+
+
+def handle_human_reaction_tool(args: dict, player=None) -> str:
+    reaction = (args or {}).get("reaction") or (args or {}).get("type") or "cough"
+    comment = (args or {}).get("comment", "")
+    res = _human_reactions_engine.trigger_reaction(
+        reaction, player=player, custom_comment=comment
+    )
+    return f"{res['phonetic']} {res['speech']}"
+
+
+# ---- Conversation Log (Replaces memory/conversation_log.py) ----
+def log_exchange(user_text: str, jarvis_text: str) -> None:
+    import datetime
+
+    log_path = str(
+        Path(__file__).resolve().parent.parent / "memory" / "conversations.jsonl"
+    )
+    ts = datetime.datetime.now().isoformat()
+    if is_rust_active() and hasattr(_rust_core, "log_conversation_exchange_rust"):
+        _rust_core.log_conversation_exchange_rust(
+            log_path, ts, user_text or "", jarvis_text or ""
+        )
+
+
+# ---- Ghost Protocol, War Mode, Cooldown, Focus Mode, System Monitor, Weather, Clipboard ----
+def ghost_protocol(parameters: dict = None, player=None) -> str:
+    engage_ghost_protocol()
+    if player and hasattr(player, "write_log"):
+        player.write_log(
+            "SYS: [GHOST PROTOCOL ACTIVATED] -- All windows minimized, audio muted, clipboard wiped."
+        )
+        if hasattr(player, "push_notification"):
+            player.push_notification(
+                "GHOST PROTOCOL ENGAGED -- STEALTH MODE ACTIVE", "warning"
+            )
+    return "Ghost Protocol engaged, Akul. All windows minimized, audio muted, and clipboard cleared. You are completely in stealth mode."
+
+
+_WAR_MODE_ACTIVE = False
+
+
+def is_war_mode_active() -> bool:
+    return _WAR_MODE_ACTIVE
+
+
+def war_mode_control(parameters: dict, player=None) -> str:
+    global _WAR_MODE_ACTIVE
+    params = parameters or {}
+    action = (params.get("action") or "activate").lower().strip()
+    app_name = (params.get("app_name") or "").strip()
+
+    if action in ("activate", "enable", "start", "on"):
+        _WAR_MODE_ACTIVE = True
+        if player and hasattr(player, "set_war_theme"):
+            player.set_war_theme(True)
+        set_process_priority("high")
+        if player and hasattr(player, "write_log"):
+            player.write_log(
+                "SYS: [WAR PROTOCOL ENGAGED] -- 12 CPU CORES & INTEL UHD GPU LOCKED TO MAXIMUM PERFORMANCE."
+            )
+        return "House Party Protocol engaged. Power diverted to tactical systems, Akul. All subsystems locked and loaded."
+    elif action in ("deactivate", "disable", "stop", "off"):
+        _WAR_MODE_ACTIVE = False
+        if player and hasattr(player, "set_war_theme"):
+            player.set_war_theme(False)
+        set_process_priority("above_normal")
+        if player and hasattr(player, "write_log"):
+            player.write_log(
+                "SYS: [WAR PROTOCOL DEACTIVATED] -- STANDBY TELEMETRY RESTORED."
+            )
+        return "Threat neutralized, sir. Standby mode restored. Excellent work out there."
+    elif action == "open_app":
+        if not app_name:
+            return "Please specify an application to open in War Mode, sir."
+        from actions.open_app import open_app
+
+        res = open_app({"app_name": app_name}, response=None, player=player)
+        return f"Deploying {app_name} under War Mode high-priority protocol, Akul. {res or ''}".strip()
+    elif action == "status":
+        status_str = (
+            "ENGAGED (Crimson Tactical HUD & Maximum Performance)"
+            if _WAR_MODE_ACTIVE
+            else "STANDBY (Standard Protocol)"
+        )
+        return f"War Protocol Status: {status_str}."
+    return f"Unknown War Mode action '{action}'. Valid actions: activate, deactivate, open_app, status."
+
+
+_cooldown_active = False
+
+
+def is_cooldown_active() -> bool:
+    return _cooldown_active
+
+
+def set_cooldown_mode(active: bool, player=None) -> str:
+    global _cooldown_active
+    _cooldown_active = bool(active)
+    if active:
+        trim_working_set_ram()
+        set_process_priority("below_normal")
+        if player:
+            if hasattr(player, "set_hud_fps"):
+                player.set_hud_fps(4)
+            if hasattr(player, "write_log"):
+                player.write_log(
+                    "STARK PROTOCOL: Thermal Cooldown & Eco Mode Active. RAM trimmed, HUD set to 4 FPS."
+                )
+            if hasattr(player, "push_notification"):
+                player.push_notification("CPU Cooldown & Eco Mode Active", "warning")
+        return "CPU Cooldown & Eco Mode ACTIVATED. Working-set RAM trimmed and UI power consumption throttled."
+    else:
+        set_process_priority("normal")
+        if player:
+            if hasattr(player, "set_hud_fps"):
+                player.set_hud_fps(10)
+            if hasattr(player, "write_log"):
+                player.write_log(
+                    "STARK PROTOCOL: Thermal Cooldown Deactivated. Standard power restored."
+                )
+            if hasattr(player, "push_notification"):
+                player.push_notification("CPU Thermal Cooldown Deactivated", "success")
+        return "CPU Cooldown Protocol DEACTIVATED. Normal system performance restored."
+
+
+def check_and_apply_cooldown(cpu_threshold: float = 85.0, player=None) -> dict:
+    import psutil
+
+    cpu_load = psutil.cpu_percent(interval=0.2)
+    ram_load = psutil.virtual_memory().percent
+    if cpu_load >= cpu_threshold and not _cooldown_active:
+        set_cooldown_mode(True, player=player)
+    elif cpu_load < 60.0 and _cooldown_active:
+        set_cooldown_mode(False, player=player)
+    return {
+        "cpu_percent": cpu_load,
+        "ram_percent": ram_load,
+        "cooldown_active": _cooldown_active,
+    }
+
+
+def cooldown_control(parameters: dict, player=None) -> str:
+    import psutil
+
+    params = parameters or {}
+    action = (params.get("action") or "status").lower().strip()
+    threshold = float(params.get("threshold", 85.0))
+    if action in ("activate", "on", "engage", "eco"):
+        return set_cooldown_mode(True, player=player)
+    elif action in ("deactivate", "off", "disengage"):
+        return set_cooldown_mode(False, player=player)
+    elif action in ("optimize_ram", "trim_ram"):
+        from actions.system_diagnostics import optimize_system_ram
+
+        return optimize_system_ram(player=player)
+    elif action in ("check", "scan"):
+        res = check_and_apply_cooldown(cpu_threshold=threshold, player=player)
+        status_str = "ACTIVE" if res["cooldown_active"] else "INACTIVE"
+        return f"CPU Load: {res['cpu_percent']}% | RAM: {res['ram_percent']}% | Cooldown Status: {status_str}"
+    status_str = (
+        "ACTIVE (Eco Power Throttled)"
+        if _cooldown_active
+        else "INACTIVE (Standard Eco)"
+    )
+    return f"CPU Thermal Cooldown Protocol Status: {status_str}. Current CPU Load: {psutil.cpu_percent()}%."
+
+
+import threading as _threading
+
+_focus_active = False
+_focus_stop_event = _threading.Event()
+_focus_end_time = None
+
+
+def is_focus_active() -> bool:
+    return _focus_active
+
+
+def focus_mode(parameters: dict, player=None, speak=None) -> str:
+    import time
+
+    global _focus_active, _focus_end_time
+    params = parameters or {}
+    action = (params.get("action") or "start").lower()
+    if action == "start":
+        if _focus_active:
+            return "Sir, focus mode is already active."
+        try:
+            duration = int(params.get("duration", 25))
+        except ValueError:
+            duration = 25
+        _focus_active = True
+        _focus_stop_event.clear()
+        _focus_end_time = time.time() + (duration * 60)
+
+        def _worker():
+            global _focus_active
+            stopped = _focus_stop_event.wait(duration * 60)
+            _focus_active = False
+            if not stopped:
+                msg = f"Focus session complete, sir. You worked for {duration} minutes."
+                if speak:
+                    try:
+                        speak(msg)
+                    except Exception:
+                        pass
+                if player and hasattr(player, "write_log"):
+                    player.write_log("Focus mode completed naturally.")
+                if player and hasattr(player, "set_state"):
+                    player.set_state("Idle")
+
+        _threading.Thread(target=_worker, daemon=True).start()
+        if player and hasattr(player, "set_state"):
+            player.set_state("Focus Mode")
+        if player and hasattr(player, "write_log"):
+            player.write_log(f"Started focus mode for {duration} minutes.")
+        return f"Focus mode activated for {duration} minutes, sir. I will minimize distractions."
+    elif action == "stop":
+        if not _focus_active:
+            return "Focus mode is not currently active, sir."
+        _focus_stop_event.set()
+        _focus_active = False
+        _focus_end_time = None
+        if player and hasattr(player, "set_state"):
+            player.set_state("Idle")
+        if player and hasattr(player, "write_log"):
+            player.write_log("Focus mode manually stopped.")
+        return "Focus mode has been deactivated, sir."
+    elif action == "status":
+        if not _focus_active or not _focus_end_time:
+            return "Focus mode is not currently active, sir."
+        remaining = _focus_end_time - time.time()
+        if remaining <= 0:
+            return "Focus session is just completing now."
+        return f"Sir, you have {int(remaining // 60)} minutes and {int(remaining % 60)} seconds remaining in your focus session."
+    return "Invalid focus mode action."
+
+
+class SystemMonitor:
+    """Background system telemetry monitor."""
+
+    def __init__(self, alert_callback):
+        self.alert_callback = alert_callback
+        self.running = False
+        self.thread = None
+
+    def start(self):
+        if not self.running:
+            self.running = True
+            self.thread = _threading.Thread(target=self._monitor_loop, daemon=True)
+            self.thread.start()
+
+    def stop(self):
+        self.running = False
+
+    def _monitor_loop(self):
+        import time
+        import psutil
+
+        net_io_start = psutil.net_io_counters()
+        time.sleep(2)
+        while self.running:
+            try:
+                cpu_usage = psutil.cpu_percent(interval=1)
+                if cpu_usage > 90:
+                    self.alert_callback(
+                        f"System Alert: CPU usage has spiked to {cpu_usage}%."
+                    )
+                mem = psutil.virtual_memory()
+                if mem.percent > 90:
+                    self.alert_callback(
+                        f"System Alert: Memory usage is critically high at {mem.percent}%."
+                    )
+                net_io_end = psutil.net_io_counters()
+                recv_mbps = (
+                    (net_io_end.bytes_recv - net_io_start.bytes_recv) / 1024 / 1024
+                ) / 10
+                sent_mbps = (
+                    (net_io_end.bytes_sent - net_io_start.bytes_sent) / 1024 / 1024
+                ) / 10
+                if recv_mbps > 50 or sent_mbps > 20:
+                    self.alert_callback(
+                        f"System Alert: Unusual network activity detected. Receiving {recv_mbps:.1f} MB/s, Sending {sent_mbps:.1f} MB/s."
+                    )
+                net_io_start = net_io_end
+                time.sleep(10)
+            except Exception:
+                time.sleep(10)
+
+
+def weather_action(parameters: dict, player=None, session_memory=None) -> str:
+    import webbrowser
+
+    params = parameters or {}
+    city = params.get("city")
+    time_str = params.get("time") or "today"
+    if not city or not isinstance(city, str):
+        msg = "Sir, the city is missing for the weather report."
+        if player and hasattr(player, "write_log"):
+            player.write_log(f"JARVIS: {msg}")
+        return msg
+    url, search_query, msg = build_weather_search_url(city, str(time_str))
+    try:
+        webbrowser.open(url)
+    except Exception:
+        return "Sir, I couldn't open the browser for the weather report."
+    if player and hasattr(player, "write_log"):
+        player.write_log(f"JARVIS: {msg}")
+    if session_memory and hasattr(session_memory, "set_last_search"):
+        try:
+            session_memory.set_last_search(query=search_query, response=msg)
+        except Exception:
+            pass
+    return msg
+
+
+_clip_monitor_active = False
+
+
+def start_clipboard_monitor():
+    import time
+    from datetime import datetime
+    import pyperclip
+
+    global _clip_monitor_active
+    if _clip_monitor_active:
+        return
+    _clip_monitor_active = True
+
+    def _clip_loop():
+        while _clip_monitor_active:
+            try:
+                cur = pyperclip.paste()
+                if cur:
+                    record_clipboard_entry(cur, datetime.now().isoformat())
+            except Exception:
+                pass
+            time.sleep(5)
+
+    _threading.Thread(target=_clip_loop, daemon=True).start()
+
+
+def clipboard_manager(parameters: dict, player=None) -> str:
+    import pyperclip
+
+    params = parameters or {}
+    action = (params.get("action") or "list").lower()
+    if action == "list":
+        entries = list_clipboard_history(10)
+        if not entries:
+            return "The clipboard history is currently empty."
+        lines = ["Here are the last clipboard entries:"]
+        for idx, txt, _ts in entries:
+            preview = txt[:50].replace("\n", " ") + ("..." if len(txt) > 50 else "")
+            lines.append(f"{idx}: {preview}")
+        return "\n".join(lines)
+    elif action == "get":
+        try:
+            idx = int(params.get("index", 0))
+            entries = list_clipboard_history(30)
+            if idx < 0 or idx >= len(entries):
+                return "Invalid clipboard index."
+            txt = entries[idx][1]
+            pyperclip.copy(txt)
+            return f"I have restored the requested clipboard entry: {txt[:100]}..."
+        except ValueError:
+            return "Please provide a valid index."
+    elif action == "search":
+        q = (params.get("query") or "").strip()
+        if not q:
+            return "Please provide a query to search the clipboard."
+        matches = search_clipboard_history(q)
+        if not matches:
+            return f"No clipboard entries found matching '{q}'."
+        lines = [f"Found {len(matches)} matching entries:"]
+        for idx, txt, _ts in matches:
+            preview = txt[:50].replace("\n", " ") + ("..." if len(txt) > 50 else "")
+            lines.append(f"{idx}: {preview}")
+        return "\n".join(lines)
+    elif action == "clear":
+        clear_clipboard_history()
+        return "Clipboard history has been cleared."
+    return "Unknown clipboard action specified."
+
+
+# ---- Document QA Engines (Replaces classifier.py, citation_engine.py, math_validator.py, claim_verifier.py) ----
+def classify_document_request(
+    title: str = "",
+    doc_type: str = "",
+    file_type: str = "",
+    content: str = "",
+    instruction: str = "",
+):
+    from core.document_qa.models import DocumentCategory
+    from core.document_qa.config import get_category_profile
+
+    cat_str = classify_document_category(
+        title=title,
+        doc_type=doc_type,
+        file_type=file_type,
+        content=content,
+        instruction=instruction,
+    )
+    try:
+        cat = DocumentCategory(cat_str)
+    except ValueError:
+        cat = DocumentCategory.GENERAL
+    return cat, get_category_profile(cat.value)
+
+
+def _map_qa_severity(sev_str: str):
+    from core.document_qa.models import IssueSeverity
+
+    s = (sev_str or "").lower()
+    if s == "critical":
+        return IssueSeverity.CRITICAL
+    if s == "high":
+        return IssueSeverity.HIGH
+    if s == "medium":
+        return IssueSeverity.MEDIUM
+    return IssueSeverity.LOW
+
+
+class CitationEngine:
+    """Native Rust-backed Citation & Bibliography Verification Engine."""
+
+    def __init__(self, style: str = "APA7"):
+        self.style = style.upper()
+
+    def audit_document_citations(
+        self, full_text: str, bibliography_text: Optional[str] = None
+    ):
+        import re
+        from core.document_qa.models import IssueSeverity, ValidationIssue
+        from core.document_qa.evidence_registry import DOI_REGEX
+
+        raw_issues = audit_citations(full_text or "", bibliography_text or "")
+        issues = [
+            ValidationIssue(
+                severity=_map_qa_severity(sev),
+                code=code,
+                message=msg,
+                section="Bibliography",
+                target_entity=target,
+                suggestion=sugg,
+            )
+            for sev, code, msg, target, sugg in raw_issues
+        ]
+        bib_text = bibliography_text or ""
+        if not bib_text:
+            ref_match = re.search(
+                r"(?i)\b(?:references|bibliography|works cited)\b[:\s]*\n([\s\S]+)$",
+                full_text or "",
+            )
+            if ref_match:
+                bib_text = ref_match.group(1)
+        bib_entries = [
+            line.strip() for line in bib_text.splitlines() if len(line.strip()) > 15
+        ]
+        all_dois = re.findall(r"\b10\.\d{4,9}/[-._;()/:A-Za-z0-9]+\b", bib_text)
+        for doi in all_dois:
+            clean_doi = doi.rstrip(".,;)")
+            if not DOI_REGEX.match(clean_doi):
+                issues.append(
+                    ValidationIssue(
+                        severity=IssueSeverity.CRITICAL,
+                        code="MALFORMED_OR_FABRICATED_DOI",
+                        message=f"Bibliographic DOI '{clean_doi}' has invalid syntax or represents a hallucinated identifier.",
+                        section="Bibliography",
+                        target_entity=clean_doi,
+                        suggestion="Verify DOI on doi.org or CrossRef and correct syntax.",
+                    )
+                )
+        return issues, {
+            "style": self.style,
+            "in_text_citations_count": max(1, len(bib_entries)),
+            "bibliography_entries_count": len(bib_entries),
+            "dois_detected": len(all_dois),
+        }
+
+
+class MathValidator:
+    """Native Rust-backed Deterministic Mathematical & Computational Validator."""
+
+    def __init__(self):
+        self.equations_checked: int = 0
+        self.tables_checked: int = 0
+
+    def validate_arithmetic_statements(
+        self, text: str, section: Optional[str] = None
+    ):
+        from core.document_qa.models import ValidationIssue
+
+        return [
+            ValidationIssue(
+                severity=_map_qa_severity(sev),
+                code=code,
+                message=msg,
+                section=section,
+                target_entity=target or None,
+                suggestion=sugg,
+            )
+            for sev, code, msg, target, sugg in validate_arithmetic(text or "")
+        ]
+
+    def validate_table_totals(
+        self, table_rows: List[List[Any]], section: Optional[str] = None
+    ):
+        from core.document_qa.models import ValidationIssue
+
+        if not table_rows or len(table_rows) < 3:
+            return []
+        self.tables_checked += 1
+        return [
+            ValidationIssue(
+                severity=_map_qa_severity(sev),
+                code=code,
+                message=msg.replace("but sum of rows is", "but recalculation yields"),
+                section=section,
+                target_entity=f"Table Column: {target}" if target else None,
+                suggestion=sugg,
+            )
+            for sev, code, msg, target, sugg in validate_table_totals(table_rows)
+        ]
+
+    def validate_spreadsheet_formulas(
+        self, workbook_data: Dict[str, Any], section: Optional[str] = None
+    ):
+        from core.document_qa.models import ValidationIssue
+
+        sheets = (workbook_data or {}).get("sheets", {})
+        return [
+            ValidationIssue(
+                severity=_map_qa_severity(sev),
+                code=code,
+                message=msg,
+                section=section,
+                target_entity=target or None,
+                suggestion=sugg,
+            )
+            for sev, code, msg, target, sugg in validate_spreadsheet_cells(sheets)
+        ]
+
+    def verify_symbolic_equation(
+        self, eq_left: str, eq_right: str
+    ) -> Tuple[bool, str]:
+        import sympy as sp
+
+        try:
+            diff = sp.simplify(sp.sympify(eq_left) - sp.sympify(eq_right))
+            if diff == 0:
+                self.equations_checked += 1
+                return True, "Symbolic mathematical equivalence verified via SymPy."
+            return False, f"Expressions are not equivalent (difference = {diff})."
+        except Exception as e:
+            return False, f"Could not parse symbolic expressions: {e}"
+
+
+class ClaimVerifier:
+    """Native Rust-backed Claim-Level Fact Verification & Epistemic Classifier."""
+
+    def __init__(self, registry=None):
+        from core.document_qa.evidence_registry import EvidenceRegistry
+
+        self.registry = registry or EvidenceRegistry()
+        self.claims = []
+        self._claim_counter: int = 1
+
+    def extract_and_classify_claims(
+        self, text: str, section: Optional[str] = None
+    ):
+        from core.document_qa.models import Claim
+
+        extracted = []
+        for clean_s in extract_material_sentences(text or ""):
+            ctype = self.classify_claim_type(clean_s)
+            c_id = f"C{self._claim_counter}"
+            self._claim_counter += 1
+            claim = Claim(
+                claim_id=c_id, text=clean_s, claim_type=ctype, section=section
+            )
+            self.verify_claim(claim)
+            self.claims.append(claim)
+            extracted.append(claim)
+        return extracted
+
+    def classify_claim_type(self, sentence: str):
+        from core.document_qa.models import ClaimType
+
+        label = classify_claim_type(sentence or "")
+        mapping = {
+            "proposed_model": ClaimType.PROPOSED_MODEL,
+            "prediction": ClaimType.PREDICTION,
+            "interpretation": ClaimType.INTERPRETATION,
+            "recommendation": ClaimType.RECOMMENDATION,
+            "hypothesis": ClaimType.HYPOTHESIS,
+            "fact": ClaimType.FACT,
+        }
+        return mapping.get(label, ClaimType.FACT)
+
+    def verify_claim(self, claim):
+        from core.document_qa.models import ClaimType, ClaimStatus
+
+        if claim.claim_type == ClaimType.PROPOSED_MODEL:
+            claim.status = ClaimStatus.NOT_APPLICABLE
+            claim.confidence = 1.0
+            claim.reasoning = (
+                "JARVIS proposed analytical model; labeled as author formulation."
+            )
+            return claim.status
+        if claim.claim_type in (ClaimType.PREDICTION, ClaimType.HYPOTHESIS):
+            claim.status = (
+                ClaimStatus.VERIFIED
+                if claim.confidence > 0.6
+                else ClaimStatus.PARTIALLY_VERIFIED
+            )
+            claim.reasoning = f"Epistemic status verified as {claim.claim_type.value}; not treated as historical fact."
+            return claim.status
+        if not self.registry.sources:
+            claim.status = ClaimStatus.UNVERIFIED
+            claim.confidence = 0.3
+            claim.reasoning = (
+                "No primary or secondary sources registered in Evidence Registry."
+            )
+            return claim.status
+        sources_list = [
+            (s_id, s.extracted_text or "")
+            for s_id, s in self.registry.sources.items()
+            if s.extracted_text
+        ]
+        status_s, conf, ev_ids, conf_notes, reason = verify_claim_concordance(
+            claim.text, sources_list
+        )
+        status_map = {
+            "verified": ClaimStatus.VERIFIED,
+            "conflicting_evidence": ClaimStatus.CONFLICTING_EVIDENCE,
+            "unverified": ClaimStatus.UNVERIFIED,
+        }
+        claim.status = status_map.get(status_s, ClaimStatus.UNVERIFIED)
+        claim.confidence = conf
+        claim.evidence_ids = ev_ids
+        if conf_notes:
+            claim.conflicting_notes = conf_notes
+        claim.reasoning = reason
+        return claim.status
+
+    def audit_claims(self):
+        import re
+        from core.document_qa.models import ClaimType, ClaimStatus, IssueSeverity, ValidationIssue
+
+        issues = []
+        for c in self.claims:
+            if c.status == ClaimStatus.CONFLICTING_EVIDENCE:
+                issues.append(
+                    ValidationIssue(
+                        severity=IssueSeverity.HIGH,
+                        code="CONFLICTING_EVIDENCE_CLAIM",
+                        message=f"Claim '{c.text[:80]}...' has conflicting numerical evidence: {c.conflicting_notes}",
+                        section=c.section,
+                        target_entity=c.claim_id,
+                        suggestion="Explicitly state the disagreement in the text or reconcile values with primary filings.",
+                    )
+                )
+            elif c.status == ClaimStatus.UNVERIFIED and c.claim_type == ClaimType.FACT:
+                has_hard_metric = bool(re.search(r"\b(?:\$\d+|\d+%)", c.text))
+                issues.append(
+                    ValidationIssue(
+                        severity=(
+                            IssueSeverity.HIGH
+                            if has_hard_metric
+                            else IssueSeverity.MEDIUM
+                        ),
+                        code="UNVERIFIED_FACTUAL_CLAIM",
+                        message=f"Factual assertion '{c.text[:80]}...' could not be verified against registered evidence.",
+                        section=c.section,
+                        target_entity=c.claim_id,
+                        suggestion="Ground claim with an authoritative source or rephrase with appropriate uncertainty.",
+                    )
+                )
+        return issues
+
 
 

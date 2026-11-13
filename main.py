@@ -72,7 +72,7 @@ from memory.memory_manager import (
 
 )
 
-from core.hardware_optimizer import optimize_hardware, trim_process_memory, start_memory_compactor
+from core.rust_bridge import optimize_hardware, trim_process_memory, start_memory_compactor
 
 
 
@@ -82,7 +82,7 @@ from actions.flight_finder     import flight_finder
 
 from actions.open_app          import open_app
 
-from actions.weather_report    import weather_action
+from core.rust_bridge import weather_action
 
 from actions.send_message      import send_message, make_call, unlock_whatsapp_locked_chats
 
@@ -122,7 +122,7 @@ from actions.smart_reply       import smart_reply
 
 from actions.email_compose     import email_compose
 
-from actions.clipboard_manager import clipboard_manager, start_clipboard_monitor
+from core.rust_bridge import clipboard_manager, start_clipboard_monitor
 
 from actions.scheduler         import schedule_task, start_scheduler
 
@@ -134,7 +134,7 @@ from actions.calendar_manager import calendar_manager
 
 from actions.document_chat     import document_chat
 
-from actions.focus_mode        import focus_mode
+from core.rust_bridge import focus_mode
 
 from actions.personality_engine import set_personality, get_personality_instruction
 
@@ -160,13 +160,13 @@ from actions.voice_macros import execute_voice_macro
 
 from actions.remote_bridge import remote_bridge_control
 
-from actions.cooldown_protocol import cooldown_control
+from core.rust_bridge import cooldown_control
 
 from actions.whatsapp_reader import read_whatsapp_messages
 
-from actions.war_mode import war_mode_control
+from core.rust_bridge import war_mode_control
 
-from actions.ghost_protocol import ghost_protocol
+from core.rust_bridge import ghost_protocol
 
 from actions.project_autopilot import create_project_workspace
 
@@ -194,7 +194,7 @@ from core.emotional_spectrum import (
 
 )
 
-from core.human_reactions import (
+from core.rust_bridge import (
 
     get_human_reactions_engine, handle_human_reaction_tool
 
@@ -220,7 +220,7 @@ from actions.college_hub import college_hub
 
 from actions.presentation_designer import presentation_designer
 
-from memory.conversation_log   import log_exchange
+from core.rust_bridge import log_exchange
 
 from core.server_security import (
 
@@ -5292,7 +5292,7 @@ class JarvisLive:
 
                     if not getattr(self, "_monitor_started", False):
 
-                        from actions.system_monitor import SystemMonitor
+                        from core.rust_bridge import SystemMonitor
 
                         def _sys_alert(msg):
 

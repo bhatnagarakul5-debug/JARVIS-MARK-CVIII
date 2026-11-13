@@ -386,4 +386,47 @@ def test_rust_concurrent_sandbox_stress(tmp_path: Path):
     assert all(results) and len(results) == 240
 
 
+def test_rust_phase5_subsystems(tmp_path: Path):
+    """Tests Phase-5 Rust functions: hardware thread governor, Win32 priority, reaction metadata, clipboard vault, weather URL builder, War/Cooldown/Focus protocols."""
+    from core.rust_bridge import (
+        set_process_priority,
+        configure_cpu_thread_env,
+        get_reaction_metadata,
+        record_clipboard_entry,
+        list_clipboard_history,
+        search_clipboard_history,
+        clear_clipboard_history,
+        build_weather_search_url,
+        optimize_hardware,
+        war_mode_control,
+        cooldown_control,
+        focus_mode,
+        clipboard_manager,
+    )
+
+    capped, total = configure_cpu_thread_env()
+    assert 1 <= capped <= 4 and total >= 1
+    assert isinstance(set_process_priority("normal"), bool)
+
+    key, lbl, gest, phon, sp, _ = get_reaction_metadata("sneeze", 14)
+    assert key == "sneeze" and lbl == "Sneeze" and gest == "sneeze" and "achoo" in phon
+
+    clear_clipboard_history()
+    assert record_clipboard_entry("Mark 108 Sovereign Rust Snippet", "2026-11-13T12:00:00") is True
+    assert len(list_clipboard_history(10)) == 1
+    assert len(search_clipboard_history("sovereign")) == 1
+    assert "Mark 108 Sovereign" in clipboard_manager({"action": "list"})
+    assert clear_clipboard_history() is True
+
+    url, sq, msg = build_weather_search_url("New Delhi", "tomorrow")
+    assert "New+Delhi" in url and "weather in New Delhi tomorrow" == sq and "New Delhi" in msg
+
+    hw_rep = optimize_hardware()
+    assert len(hw_rep) >= 4
+    assert "STANDBY" in war_mode_control({"action": "status"}) or "ENGAGED" in war_mode_control({"action": "status"})
+    assert "Cooldown" in cooldown_control({"action": "status"})
+    assert "Focus mode" in focus_mode({"action": "status"})
+
+
+
 
