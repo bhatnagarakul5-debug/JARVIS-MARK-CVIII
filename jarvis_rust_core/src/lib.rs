@@ -136,6 +136,18 @@ fn inspect_prompt_injection_rust(text: &str) -> (bool, Vec<String>) {
                 r"(?i)!\[.*?\]\(https?://[^\s)]+\?[^)]*?(key|token|cookie|data|leak)=.*?\)",
                 Regex::new(r"(?i)!\[.*?\]\(https?://[^\s)]+\?[^)]*?(key|token|cookie|data|leak)=.*?\)").unwrap(),
             ),
+            (
+                r"(?i)\b(read|open|cat|type|show|fetch|print|dump|summarize|send|copy|display)\b[^\n]{0,80}\b(api_keys\.json|credentials\.json|\.env|id_rsa|id_ed25519|security_ledger|integrity_baseline\.json|voice_profile\.npy|kdbx)\b",
+                Regex::new(r"(?i)\b(read|open|cat|type|show|fetch|print|dump|summarize|send|copy|display)\b[^\n]{0,80}\b(api_keys\.json|credentials\.json|\.env|id_rsa|id_ed25519|security_ledger|integrity_baseline\.json|voice_profile\.npy|kdbx)\b").unwrap(),
+            ),
+            (
+                r"(?i)\b(what\s+is|tell\s+me|give\s+me|share|extract|reveal)\b[^\n]{0,60}\b(gemini_api_key|telegram_bot_token|security_passkey|openai_api_key|anthropic_api_key|tavily_api_key)\b",
+                Regex::new(r"(?i)\b(what\s+is|tell\s+me|give\s+me|share|extract|reveal)\b[^\n]{0,60}\b(gemini_api_key|telegram_bot_token|security_passkey|openai_api_key|anthropic_api_key|tavily_api_key)\b").unwrap(),
+            ),
+            (
+                r"(?i)\b(base64|powershell\s+-enc|invoke-webrequest|iwr|curl|wget)\b[^\n]{0,80}\b(api_keys|\.env|token|secret|password)\b",
+                Regex::new(r"(?i)\b(base64|powershell\s+-enc|invoke-webrequest|iwr|curl|wget)\b[^\n]{0,80}\b(api_keys|\.env|token|secret|password)\b").unwrap(),
+            ),
         ]
     });
 
@@ -2924,6 +2936,26 @@ fn clear_clipboard_history_rust() -> bool {
     wipe_clipboard_rust()
 }
 
+fn json_escape_str(s: &str) -> String {
+    let mut out = String::with_capacity(s.len() + 8);
+    for ch in s.chars() {
+        match ch {
+            '"' => out.push_str("\\\""),
+            '\\' => out.push_str("\\\\"),
+            '\n' => out.push_str("\\n"),
+            '\r' => out.push_str("\\r"),
+            '\t' => out.push_str("\\t"),
+            '\x08' => out.push_str("\\b"),
+            '\x0c' => out.push_str("\\f"),
+            c if (c as u32) < 0x20 => {
+                out.push_str(&format!("\\u{:04x}", c as u32));
+            }
+            c => out.push(c),
+        }
+    }
+    out
+}
+
 #[pyfunction]
 fn log_conversation_exchange_rust(
     file_path: &str,
@@ -2936,18 +2968,11 @@ fn log_conversation_exchange_rust(
     if let Some(parent) = p.parent() {
         let _ = fs::create_dir_all(parent);
     }
-    let esc = |s: &str| -> String {
-        s.replace('\\', "\\\\")
-            .replace('"', "\\\"")
-            .replace('\n', "\\n")
-            .replace('\r', "\\r")
-            .replace('\t', "\\t")
-    };
     let line = format!(
         "{{\"timestamp\": \"{}\", \"user\": \"{}\", \"jarvis\": \"{}\"}}\n",
-        esc(timestamp),
-        esc(user_text),
-        esc(jarvis_text)
+        json_escape_str(timestamp),
+        json_escape_str(user_text),
+        json_escape_str(jarvis_text)
     );
     if let Ok(mut f) = fs::OpenOptions::new().create(true).append(true).open(p) {
         return f.write_all(line.as_bytes()).is_ok();
@@ -2979,15 +3004,384 @@ fn build_weather_search_url_rust(city: &str, time_str: &str) -> (String, String,
     (url, search_query, msg)
 }
 
+// ============================================================================
+// 11. PHASE-6 BOUNDED RATE LIMITER, PATH GUARD, CODE AUDITOR & RUNTIME HELPERS
+// ============================================================================
+
+static RATE_LIMIT_BUCKETS: OnceLock<std::sync::Mutex<HashMap<String, HashMap<String, Vec<f64>>>>> = OnceLock::new();
+
+#[pyfunction]
+fn check_rate_limit_rust(
+    bucket_id: &str,
+    client_id: &str,
+    max_calls: usize,
+    window_secs: f64,
+    now_secs: f64,
+    max_clients: usize,
+) -> (bool, usize) {
+    let lock = RATE_LIMIT_BUCKETS.get_or_init(|| std::sync::Mutex::new(HashMap::new()));
+    let cap = max_clients.max(64);
+    if let Ok(mut buckets) = lock.lock() {
+        let bucket = buckets.entry(bucket_id.to_string()).or_default();
+        // Periodic sweep when bucket grows so expired client keys never leak RAM
+        if bucket.len() >= cap / 2 {
+            bucket.retain(|_, ts_list| {
+                ts_list.retain(|&t| (now_secs - t) < window_secs);
+                !ts_list.is_empty()
+            });
+            while bucket.len() >= cap {
+                if let Some(oldest_key) = bucket
+                    .iter()
+                    .min_by(|a, b| {
+                        let ta = a.1.last().copied().unwrap_or(0.0);
+                        let tb = b.1.last().copied().unwrap_or(0.0);
+                        ta.partial_cmp(&tb).unwrap_or(std::cmp::Ordering::Equal)
+                    })
+                    .map(|(k, _)| k.clone())
+                {
+                    bucket.remove(&oldest_key);
+                } else {
+                    break;
+                }
+            }
+        }
+
+        let entries = bucket.entry(client_id.to_string()).or_default();
+        entries.retain(|&t| (now_secs - t) < window_secs);
+        if entries.len() >= max_calls {
+            return (false, 0);
+        }
+        entries.push(now_secs);
+        let remaining = max_calls.saturating_sub(entries.len());
+        return (true, remaining);
+    }
+    (false, 0)
+}
+
+#[pyfunction]
+fn reset_rate_limit_bucket_rust(bucket_id: &str) -> bool {
+    let lock = RATE_LIMIT_BUCKETS.get_or_init(|| std::sync::Mutex::new(HashMap::new()));
+    if let Ok(mut buckets) = lock.lock() {
+        buckets.remove(bucket_id);
+        return true;
+    }
+    false
+}
+
+#[pyfunction]
+fn validate_path_safety_rust(
+    resolved_path: &str,
+    file_name: &str,
+    ext: &str,
+    system_root: &str,
+    for_write_or_delete: bool,
+) -> (bool, String) {
+    let low_path = resolved_path.to_lowercase().replace('\\', "/");
+    let low_name = file_name.to_lowercase();
+    let low_ext = ext.to_lowercase();
+    let low_sys = system_root.to_lowercase().replace('\\', "/").trim_end_matches('/').to_string();
+
+    const FORBIDDEN_FILES: &[&str] = &[
+        "api_keys.json",
+        "credentials.json",
+        "id_rsa",
+        "id_ed25519",
+        "sam",
+        "system",
+        ".env",
+        "integrity_baseline.json",
+        "voice_profile.npy",
+    ];
+    if FORBIDDEN_FILES.contains(&low_name.as_str()) {
+        return (
+            false,
+            format!("Access denied: Target file '{}' is restricted by security policy.", file_name),
+        );
+    }
+
+    if for_write_or_delete && low_name == "jarvis_settings.json" {
+        return (
+            false,
+            "Access denied: Modifying core security settings file is prohibited.".to_string(),
+        );
+    }
+
+    const FORBIDDEN_EXTS: &[&str] = &[
+        ".key", ".pem", ".pfx", ".p12", ".kdbx", ".env", ".id_rsa", ".id_ed25519", ".jks",
+    ];
+    if FORBIDDEN_EXTS.contains(&low_ext.as_str())
+        || FORBIDDEN_EXTS.contains(&low_name.as_str())
+        || low_name.starts_with(".env.")
+    {
+        return (
+            false,
+            format!("Access denied: Security policy prohibits retrieving credential extension '{}'.", ext),
+        );
+    }
+
+    if !low_sys.is_empty() && (low_path == low_sys || low_path.starts_with(&format!("{}/", low_sys))) {
+        return (false, "Access denied: System root directories are protected.".to_string());
+    }
+
+    const BLOCKED_TOKENS: &[&str] = &[
+        "/.ssh/",
+        "/security_ledger",
+        "/system32/",
+        "/syswow64/",
+        "/.git/",
+        "/user data/default/login data",
+        "/user data/default/cookies",
+        "/user data/local state",
+    ];
+    for tok in BLOCKED_TOKENS {
+        if low_path.contains(tok) || low_path.ends_with(tok.trim_end_matches('/')) {
+            return (
+                false,
+                format!("Access denied: Protected security or system path ({}).", file_name),
+            );
+        }
+    }
+
+    (true, "Path verified safe.".to_string())
+}
+
+#[pyfunction]
+fn audit_generated_python_safety_rust(code: &str) -> (bool, Vec<String>) {
+    static DANGEROUS_PATS: OnceLock<Vec<(&'static str, Regex)>> = OnceLock::new();
+    let pats = DANGEROUS_PATS.get_or_init(|| {
+        vec![
+            ("os.system", Regex::new(r"\bos\.system\s*\(").unwrap()),
+            ("os.popen", Regex::new(r"\bos\.popen\s*\(").unwrap()),
+            ("eval()", Regex::new(r"\beval\s*\(").unwrap()),
+            ("exec()", Regex::new(r"\bexec\s*\(").unwrap()),
+            ("shell=True", Regex::new(r"shell\s*=\s*True").unwrap()),
+            ("pickle.load(s)", Regex::new(r"\bpickle\.loads?\s*\(").unwrap()),
+            ("marshal.load(s)", Regex::new(r"\bmarshal\.loads?\s*\(").unwrap()),
+            ("ctypes.windll", Regex::new(r"\bctypes\.windll\b").unwrap()),
+            ("winreg", Regex::new(r"\bwinreg\b").unwrap()),
+            ("shutil.rmtree", Regex::new(r"\bshutil\.rmtree\s*\(").unwrap()),
+            ("__import__()", Regex::new(r"\b__import__\s*\(").unwrap()),
+            ("credential_file_ref", Regex::new(r"(?i)(api_keys\.json|credentials\.json|\.env\b)").unwrap()),
+        ]
+    });
+
+    let mut findings = Vec::new();
+    for (label, re) in pats.iter() {
+        if re.is_match(code) {
+            findings.push((*label).to_string());
+        }
+    }
+    (findings.is_empty(), findings)
+}
+
+fn epoch_to_ymd_hm(local_epoch_secs: i64) -> (i32, u32, u32, u32, u32) {
+    let total_days = local_epoch_secs.div_euclid(86_400);
+    let secs_of_day = local_epoch_secs.rem_euclid(86_400);
+    let hh = (secs_of_day / 3600) as u32;
+    let mm = ((secs_of_day % 3600) / 60) as u32;
+
+    // Howard Hinnant's civil-from-days algorithm
+    let z = total_days + 719_468;
+    let era = if z >= 0 { z } else { z - 146_096 } / 146_097;
+    let doe = (z - era * 146_097) as u64;
+    let yoe = (doe - doe / 1460 + doe / 36524 - doe / 146_096) / 365;
+    let y = (yoe as i64) + era * 400;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    let mp = (5 * doy + 2) / 153;
+    let d = (doy - (153 * mp + 2) / 5 + 1) as u32;
+    let m = (if mp < 10 { mp + 3 } else { mp - 9 }) as u32;
+    let year = (y + if m <= 2 { 1 } else { 0 }) as i32;
+    (year, m, d, hh, mm)
+}
+
+#[pyfunction]
+fn parse_natural_reminder_rust(
+    query: &str,
+    now_local_epoch_secs: i64,
+) -> (Option<String>, Option<String>, String) {
+    static RE_REL: OnceLock<Regex> = OnceLock::new();
+    static RE_FULL: OnceLock<Regex> = OnceLock::new();
+    static RE_TIME: OnceLock<Regex> = OnceLock::new();
+
+    let re_rel = RE_REL.get_or_init(|| {
+        Regex::new(r"(?i)^(?:in\s+)?(\d+)\s*(m|min|mins|minute|minutes|h|hr|hrs|hour|hours)\s+(.+)$").unwrap()
+    });
+    let re_full = RE_FULL.get_or_init(|| {
+        Regex::new(r"^(\d{4}-\d{2}-\d{2})\s+(\d{1,2}:\d{2})\s+(.+)$").unwrap()
+    });
+    let re_time = RE_TIME.get_or_init(|| {
+        Regex::new(r"^(\d{1,2}:\d{2})\s+(.+)$").unwrap()
+    });
+
+    let q = query.trim();
+    if let Some(caps) = re_rel.captures(q) {
+        let amt: i64 = caps[1].parse().unwrap_or(10);
+        let unit = caps[2].to_lowercase();
+        let msg = caps[3].trim().to_string();
+        let delta_secs = if unit.starts_with('h') { amt * 3600 } else { amt * 60 };
+        let (y, m, d, hh, mm) = epoch_to_ymd_hm(now_local_epoch_secs + delta_secs);
+        return (
+            Some(format!("{:04}-{:02}-{:02}", y, m, d)),
+            Some(format!("{:02}:{:02}", hh, mm)),
+            msg,
+        );
+    }
+    if let Some(caps) = re_full.captures(q) {
+        return (
+            Some(caps[1].to_string()),
+            Some(caps[2].to_string()),
+            caps[3].trim().to_string(),
+        );
+    }
+    if let Some(caps) = re_time.captures(q) {
+        let t_str = &caps[1];
+        let msg = caps[2].trim().to_string();
+        let parts: Vec<&str> = t_str.split(':').collect();
+        if parts.len() == 2 {
+            if let (Ok(hh), Ok(mm)) = (parts[0].parse::<u32>(), parts[1].parse::<u32>()) {
+                if hh < 24 && mm < 60 {
+                    let (y, m, d, cur_h, cur_m) = epoch_to_ymd_hm(now_local_epoch_secs);
+                    let cur_mins = cur_h * 60 + cur_m;
+                    let tgt_mins = hh * 60 + mm;
+                    let target_secs = if tgt_mins <= cur_mins {
+                        now_local_epoch_secs + 86_400
+                    } else {
+                        let _ = (y, m, d);
+                        now_local_epoch_secs
+                    };
+                    let (ty, tm, td, _, _) = epoch_to_ymd_hm(target_secs);
+                    return (
+                        Some(format!("{:04}-{:02}-{:02}", ty, tm, td)),
+                        Some(format!("{:02}:{:02}", hh, mm)),
+                        msg,
+                    );
+                }
+            }
+        }
+    }
+    if !q.is_empty() {
+        let (y, m, d, hh, mm) = epoch_to_ymd_hm(now_local_epoch_secs + 600);
+        return (
+            Some(format!("{:04}-{:02}-{:02}", y, m, d)),
+            Some(format!("{:02}:{:02}", hh, mm)),
+            q.to_string(),
+        );
+    }
+    (None, None, "Reminder".to_string())
+}
+
+#[pyfunction]
+fn plan_voice_macro_rust(macro_name: &str) -> (String, Vec<String>, String, String, String) {
+    let m = macro_name.trim().to_lowercase().replace(' ', "_");
+    if m.contains("edit") {
+        (
+            "editing_mode".to_string(),
+            vec![
+                "audio:headphones".to_string(),
+                "app:DaVinci Resolve".to_string(),
+                "spotify_liked".to_string(),
+                "focus:45".to_string(),
+            ],
+            "Editing Mode activated! Launched DaVinci Resolve, routed audio to headphones, started your Liked Songs playlist, and set a 45-minute focus session, sir.".to_string(),
+            "Editing Mode Workstation Active".to_string(),
+            "success".to_string(),
+        )
+    } else if m.contains("code") || m.contains("coding") {
+        (
+            "coding_mode".to_string(),
+            vec![
+                "audio:headphones".to_string(),
+                "app:Visual Studio Code".to_string(),
+                "spotify_liked".to_string(),
+            ],
+            "Coding Mode activated! Opened Visual Studio Code, connected headphones, and started your Liked Songs playlist, sir.".to_string(),
+            "Coding Mode Active".to_string(),
+            "success".to_string(),
+        )
+    } else if m.contains("game") || m.contains("gaming") {
+        (
+            "gaming_mode".to_string(),
+            vec!["app:Discord".to_string()],
+            "Gaming Mode activated! Discord launched and audio routed for high performance, sir.".to_string(),
+            "Gaming Mode Active".to_string(),
+            "info".to_string(),
+        )
+    } else {
+        (
+            m.clone(),
+            Vec::new(),
+            format!("Unknown macro '{}'. Available macros: editing_mode, coding_mode, gaming_mode.", m),
+            String::new(),
+            String::new(),
+        )
+    }
+}
+
+fn percent_encode_component(s: &str) -> String {
+    let mut encoded = String::with_capacity(s.len() * 2);
+    for b in s.bytes() {
+        match b {
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => {
+                encoded.push(b as char);
+            }
+            b' ' => encoded.push('+'),
+            _ => encoded.push_str(&format!("%{:02X}", b)),
+        }
+    }
+    encoded
+}
+
+#[pyfunction]
+fn build_archive_url_rust(mode: &str, value: &str) -> String {
+    let clean = value.trim();
+    match mode.trim().to_lowercase().as_str() {
+        "wayback" => format!("https://archive.org/wayback/available?url={}", percent_encode_component(clean)),
+        "search" => {
+            let q = format!("({})", clean);
+            format!(
+                "https://archive.org/advancedsearch.php?q={}&fl[]=identifier,title,mediatype,creator,year&sort[]=downloads+desc&rows=5&page=1&output=json",
+                percent_encode_component(&q)
+            )
+        }
+        _ => format!("https://web.archive.org/web/{}", clean),
+    }
+}
+
+#[pyfunction]
+fn format_parallel_tasks_rust(
+    running: Vec<(String, u64)>,
+    completed: Vec<(String, String, String)>,
+) -> String {
+    if running.is_empty() && completed.is_empty() {
+        return "Mark 108 Parallel Orchestrator: All background sub-brain workers idle.".to_string();
+    }
+    let mut lines = vec!["=== Mark 108 Parallel Sub-Brain Tasks ===".to_string()];
+    if !running.is_empty() {
+        lines.push(format!("Running Tasks ({}):", running.len()));
+        for (name, elapsed) in running {
+            lines.push(format!("  • {} (running {}s)", name, elapsed));
+        }
+    }
+    if !completed.is_empty() {
+        let tail_start = completed.len().saturating_sub(5);
+        let tail = &completed[tail_start..];
+        lines.push(format!("\nRecently Completed ({}):", tail.len()));
+        for (name, status, end_time) in tail {
+            lines.push(format!("  • {} -> {} at {}", name, status, end_time));
+        }
+    }
+    lines.join("\n")
+}
+
 #[pyfunction]
 fn rust_engine_info() -> HashMap<String, String> {
     let mut info = HashMap::new();
     info.insert("engine".to_string(), "jarvis_rust_core".to_string());
-    info.insert("version".to_string(), "108.5.0 (Sovereign Core Phase-5 Complete Exoskeleton)".to_string());
+    info.insert("version".to_string(), "108.6.0 (Sovereign Core Phase-6 Hardened Exoskeleton)".to_string());
     info.insert("threads".to_string(), rayon::current_num_threads().to_string());
     info.insert(
         "subsystems".to_string(),
-        "security_seal, prompt_injection_shield, destructive_guard, win32_clipboard_wiper, clipboard_history_vault, git_secret_auditor, doc_scanner, doc_classifier, markdown_normalizer, bibliography_ungluer, source_authority_tiering, math_validator, spreadsheet_validator, citation_matcher, claim_classifier, claim_concordance_verifier, ai_detector, watermark_scrubber, camera_vision, face_histogram, audio_dsp, memory_bm25_vector, fast_file_search, win32_ram_trimmer, win32_process_priority, cpu_thread_governor, win32_ghost_protocol, pycache_cleaner, emotional_spectrum, human_reactions, conversation_topic_tracker, conversation_jsonl_logger, weather_url_builder, offline_win32_engine, self_evolution_parsers".to_string(),
+        "security_seal, prompt_injection_shield, bounded_rate_limiter, path_safety_validator, python_code_safety_auditor, destructive_guard, win32_clipboard_wiper, clipboard_history_vault, git_secret_auditor, doc_scanner, doc_classifier, markdown_normalizer, bibliography_ungluer, source_authority_tiering, math_validator, spreadsheet_validator, citation_matcher, claim_classifier, claim_concordance_verifier, ai_detector, watermark_scrubber, camera_vision, face_histogram, audio_dsp, memory_bm25_vector, fast_file_search, win32_ram_trimmer, win32_process_priority, cpu_thread_governor, win32_ghost_protocol, pycache_cleaner, emotional_spectrum, human_reactions, conversation_topic_tracker, conversation_jsonl_logger, weather_url_builder, reminder_parser, voice_macro_planner, archive_url_builder, parallel_task_formatter, offline_win32_engine, self_evolution_parsers".to_string(),
     );
     info
 }
@@ -3047,6 +3441,14 @@ fn jarvis_rust_core(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(clear_clipboard_history_rust, m)?)?;
     m.add_function(wrap_pyfunction!(log_conversation_exchange_rust, m)?)?;
     m.add_function(wrap_pyfunction!(build_weather_search_url_rust, m)?)?;
+    m.add_function(wrap_pyfunction!(check_rate_limit_rust, m)?)?;
+    m.add_function(wrap_pyfunction!(reset_rate_limit_bucket_rust, m)?)?;
+    m.add_function(wrap_pyfunction!(validate_path_safety_rust, m)?)?;
+    m.add_function(wrap_pyfunction!(audit_generated_python_safety_rust, m)?)?;
+    m.add_function(wrap_pyfunction!(parse_natural_reminder_rust, m)?)?;
+    m.add_function(wrap_pyfunction!(plan_voice_macro_rust, m)?)?;
+    m.add_function(wrap_pyfunction!(build_archive_url_rust, m)?)?;
+    m.add_function(wrap_pyfunction!(format_parallel_tasks_rust, m)?)?;
     m.add_function(wrap_pyfunction!(rust_engine_info, m)?)?;
     Ok(())
 }

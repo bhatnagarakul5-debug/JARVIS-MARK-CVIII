@@ -94,12 +94,23 @@ def _speak_into_call(text: str):
             engine.stop()
     except Exception as e:
         print(f"[CallManager] TTS error: {e}")
-        # Fallback: use os-level speech
+        # Fallback: use os-level speech via UTF-16LE Base64 -EncodedCommand (no shell/quote injection)
         try:
+            import base64
             import subprocess
-            ps_cmd = f'Add-Type -AssemblyName System.Speech; $s = New-Object System.Speech.Synthesis.SpeechSynthesizer; $s.Speak("{text[:200]}")'
-            subprocess.Popen(["powershell", "-Command", ps_cmd], 
-                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            safe_txt = str(text or "")[:200]
+            env = os.environ.copy()
+            env["JARVIS_TTS_TEXT"] = safe_txt
+            ps_script = (
+                "Add-Type -AssemblyName System.Speech; "
+                "$s = New-Object System.Speech.Synthesis.SpeechSynthesizer; "
+                "$s.Speak($env:JARVIS_TTS_TEXT)"
+            )
+            enc_cmd = base64.b64encode(ps_script.encode("utf-16-le")).decode("ascii")
+            subprocess.Popen(
+                ["powershell", "-NoProfile", "-EncodedCommand", enc_cmd],
+                env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+            )
         except Exception:
             pass
 

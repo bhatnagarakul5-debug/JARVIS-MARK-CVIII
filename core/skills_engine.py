@@ -162,12 +162,19 @@ CRITICAL REQUIREMENTS:
             except Exception:
                 code_to_write = ""
 
-        # Verify syntax and entrypoint; fall back to deterministic template if AI output is invalid
+        # Verify syntax, entrypoint, AND native Rust security audit before persisting
         valid_syntax = False
         if code_to_write and f"def {clean_name}" in code_to_write:
             try:
                 compile(code_to_write, f"{clean_name}.py", "exec")
-                valid_syntax = True
+                from core.rust_bridge import audit_generated_python_safety
+                safe_code, findings = audit_generated_python_safety(code_to_write)
+                if not safe_code:
+                    if player and hasattr(player, "write_log"):
+                        player.write_log(f"SKILLS ENGINE SECURITY SHIELD: Rejected unsafe generated constructs {findings}; using safe template.")
+                    valid_syntax = False
+                else:
+                    valid_syntax = True
             except SyntaxError:
                 valid_syntax = False
 

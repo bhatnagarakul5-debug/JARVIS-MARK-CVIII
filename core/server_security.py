@@ -25,6 +25,7 @@ import base64
 import hashlib
 import re
 import random
+import secrets
 import threading
 from pathlib import Path
 from datetime import datetime
@@ -67,12 +68,14 @@ def log_security_event(event_type: str, severity: str, details: str, client_id: 
 
 class RateLimiter:
     """
-    Thread-safe Token Bucket Rate Limiter.
-    Limits requests to max_calls per time_window_sec per client_id.
+    Thread-safe Bounded Token Bucket Rate Limiter backed by `jarvis_rust_core`.
+    Limits requests to max_calls per time_window_sec per client_id and prunes stale keys.
     """
-    def __init__(self, max_calls: int = 15, time_window_sec: float = 60.0):
+    def __init__(self, max_calls: int = 15, time_window_sec: float = 60.0, max_clients: int = 2048):
         self.max_calls = max_calls
         self.time_window = time_window_sec
+        self.max_clients = max_clients
+        self._bucket_id = f"rl_{id(self)}"
         self._clients: Dict[str, List[float]] = {}
         self._lock = threading.Lock()
 
@@ -84,11 +87,43 @@ class RateLimiter:
         now = time.time()
         client_key = str(client_id)
 
+        try:
+            from core.rust_bridge import check_rate_limit as _rust_rl, is_rust_active
+            if is_rust_active():
+                allowed, remaining = _rust_rl(
+                    self._bucket_id,
+                    client_key,
+                    self.max_calls,
+                    self.time_window,
+                    now_secs=now,
+                    max_clients=self.max_clients,
+                )
+                if not allowed:
+                    log_security_event(
+                        "RATE_LIMIT_EXCEEDED",
+                        "WARN",
+                        f"Rate limit of {self.max_calls} req/{self.time_window}s exceeded.",
+                        client_id=client_key,
+                    )
+                return allowed, remaining
+        except Exception:
+            pass
+
         with self._lock:
+            if len(self._clients) >= self.max_clients // 2:
+                stale_keys = [
+                    k for k, ts_list in self._clients.items()
+                    if not any((now - t) < self.time_window for t in ts_list)
+                ]
+                for k in stale_keys:
+                    del self._clients[k]
+                while len(self._clients) >= self.max_clients:
+                    oldest_key = min(self._clients, key=lambda k: self._clients[k][-1] if self._clients[k] else 0.0)
+                    del self._clients[oldest_key]
+
             if client_key not in self._clients:
                 self._clients[client_key] = []
 
-            # Purge calls older than the time window
             self._clients[client_key] = [t for t in self._clients[client_key] if (now - t) < self.time_window]
 
             if len(self._clients[client_key]) >= self.max_calls:
@@ -226,7 +261,7 @@ FORBIDDEN_EXTENSIONS = {
 }
 
 FORBIDDEN_FILES = {
-    "api_keys.json", "credentials.json", "id_rsa", "id_ed25519", "sam", "system"
+    "api_keys.json", "credentials.json", "id_rsa", "id_ed25519", "sam", "system", ".env", "integrity_baseline.json", "voice_profile.npy"
 }
 
 def validate_safe_file_access(requested_path: Union[str, Path]) -> Tuple[bool, Optional[Path], str]:
@@ -251,8 +286,19 @@ def validate_safe_file_access(requested_path: Union[str, Path]) -> Tuple[bool, O
         log_security_event("RESTRICTED_EXTENSION_BLOCKED", "ALERT", f"Attempted access to restricted extension: {p.suffix}")
         return False, None, "Access denied: Security policy prohibits retrieving credential files."
 
-    # Prevent reading Windows System files
+    # Native Rust path & credential store shield
     win_dir = Path(os.environ.get("SystemRoot", "C:/Windows")).resolve()
+    try:
+        from core.rust_bridge import validate_path_safety as _rust_path_ok, is_rust_active
+        if is_rust_active():
+            ok_rust, msg_rust = _rust_path_ok(p, p.name, p.suffix, str(win_dir), for_write_or_delete=False)
+            if not ok_rust:
+                log_security_event("RUST_PATH_POLICY_BLOCKED", "ALERT", f"{msg_rust}: {p}")
+                return False, None, msg_rust
+    except Exception:
+        pass
+
+    # Prevent reading Windows System files
     try:
         if p.is_relative_to(win_dir):
             log_security_event("SYSTEM_DIRECTORY_ESCAPE_BLOCKED", "ALERT", f"Attempted access to Windows directory: {p}")
@@ -260,12 +306,12 @@ def validate_safe_file_access(requested_path: Union[str, Path]) -> Tuple[bool, O
     except Exception:
         pass
 
-    # Prevent reading sensitive memory or config folders
+    # Prevent reading sensitive config folder
     cfg_dir = (BASE_DIR / "config").resolve()
     try:
-        if p == (cfg_dir / "api_keys.json").resolve():
-            log_security_event("API_KEYS_THEFT_PREVENTED", "ALERT", "Attempted access to api_keys.json")
-            return False, None, "Access denied: Credentials cannot be extracted."
+        if p.is_relative_to(cfg_dir):
+            log_security_event("CONFIG_DIRECTORY_ACCESS_BLOCKED", "ALERT", f"Attempted remote access to config file: {p.name}")
+            return False, None, "Access denied: Config and credential files cannot be extracted."
     except Exception:
         pass
 
@@ -740,22 +786,23 @@ class DestructiveActionGuard:
 
     def create_challenge(self, action_name: str, target: str, callback: Optional[Any] = None) -> Tuple[str, str]:
         """
-        Creates an ephemeral 3-digit verification challenge valid for 60 seconds.
+        Creates an ephemeral CSPRNG 6-digit verification challenge valid for 60 seconds (max 3 attempts).
         Returns: (code: str, prompt_message: str)
         """
-        code = str(random.randint(100, 999))
+        code = str(secrets.randbelow(900000) + 100000)
         self._active_challenge = {
             "code": code,
             "action": action_name,
             "target": target,
             "callback": callback,
             "created_at": time.time(),
-            "expires_at": time.time() + 60.0
+            "expires_at": time.time() + 60.0,
+            "attempts": 0,
         }
         log_security_event(
             "DESTRUCTIVE_CHALLENGE_ISSUED",
             "WARN",
-            f"Action: '{action_name}' on '{target}'. Verification code: {code}"
+            f"Action: '{action_name}' on '{target}'. CSPRNG verification challenge issued."
         )
         msg = (
             f"⚠️ CONFIRMATION REQUIRED: Destructive action '{action_name}' requested on '{target}'.\n"
@@ -789,8 +836,15 @@ class DestructiveActionGuard:
             log_security_event("DESTRUCTIVE_ACTION_APPROVED", "INFO", f"Verified code for '{action}'")
             return True, res, f"✅ Verified: Executed '{action}'."
         else:
-            log_security_event("CHALLENGE_CODE_MISMATCH", "WARN", f"Incorrect code '{candidate_code}' for '{ch['action']}'")
-            return False, None, "❌ Incorrect verification code. Action aborted."
+            ch["attempts"] = ch.get("attempts", 0) + 1
+            remaining_tries = max(0, 3 - ch["attempts"])
+            if remaining_tries == 0:
+                action = ch["action"]
+                self._active_challenge = None
+                log_security_event("CHALLENGE_BRUTE_FORCE_LOCKED", "ALERT", f"Max challenge attempts exceeded for '{action}'")
+                return False, None, "❌ Maximum verification attempts exceeded. Challenge locked & cancelled."
+            log_security_event("CHALLENGE_CODE_MISMATCH", "WARN", f"Incorrect code attempted for '{ch['action']}' ({remaining_tries} tries left)")
+            return False, None, f"❌ Incorrect verification code ({remaining_tries} attempts remaining). Action aborted."
 
     def cancel_active_challenge(self) -> str:
         if self._active_challenge:
@@ -811,6 +865,7 @@ def get_destructive_action_guard() -> DestructiveActionGuard:
 # ====================================================================
 
 _SYSTEM_LOCKED = False
+_EPHEMERAL_LOCK_TOKEN: Optional[str] = None
 
 def wipe_clipboard() -> bool:
     """Wipes Windows clipboard using native `jarvis_rust_core` Win32 user32 API."""
@@ -829,8 +884,15 @@ def trigger_protocol_blackout(ui_handle: Optional[Any] = None, reason: str = "Ma
     - Minimizes / locks UI
     - Logs high-severity security event
     """
-    global _SYSTEM_LOCKED
+    global _SYSTEM_LOCKED, _EPHEMERAL_LOCK_TOKEN
     _SYSTEM_LOCKED = True
+    _AUTH_GUARD._load_config()
+    configured = (_AUTH_GUARD._secret_passkey or os.environ.get("JARVIS_SECURITY_PASSKEY", "")).strip()
+    if not configured:
+        _EPHEMERAL_LOCK_TOKEN = secrets.token_urlsafe(12)
+        print(f"[SECURITY] No static security_passkey configured. Session blackout recovery token: {_EPHEMERAL_LOCK_TOKEN}")
+    else:
+        _EPHEMERAL_LOCK_TOKEN = None
     wiped = wipe_clipboard()
 
     log_security_event(
@@ -860,15 +922,20 @@ def trigger_protocol_blackout(ui_handle: Optional[Any] = None, reason: str = "Ma
 
 def unlock_protocol_blackout(passkey: str, ui_handle: Optional[Any] = None) -> Tuple[bool, str]:
     """
-    Disengages Protocol Blackout using the security passkey.
-    Restores normal operational state.
+    Disengages Protocol Blackout using configured security passkey or session ephemeral token.
+    Never falls back to a static hardcoded default passkey.
     """
-    global _SYSTEM_LOCKED
+    global _SYSTEM_LOCKED, _EPHEMERAL_LOCK_TOKEN
     _AUTH_GUARD._load_config()
-    expected_passkey = (_AUTH_GUARD._secret_passkey or os.environ.get("JARVIS_SECURITY_PASSKEY", "")).strip() or "jarvis-override"
+    expected_passkey = (_AUTH_GUARD._secret_passkey or os.environ.get("JARVIS_SECURITY_PASSKEY", "")).strip() or _EPHEMERAL_LOCK_TOKEN
+
+    if not expected_passkey:
+        log_security_event("UNLOCK_BLOCKED_NO_PASSKEY", "ALERT", "Protocol Blackout unlock rejected: no passkey configured.")
+        return False, "❌ Unlock rejected: Configure `security_passkey` in config/api_keys.json or JARVIS_SECURITY_PASSKEY."
 
     if hmac.compare_digest(passkey.strip().encode("utf-8"), expected_passkey.encode("utf-8")):
         _SYSTEM_LOCKED = False
+        _EPHEMERAL_LOCK_TOKEN = None
         log_security_event("SYSTEM_UNLOCKED", "INFO", "Protocol Blackout disengaged via valid passkey.")
 
         if ui_handle:

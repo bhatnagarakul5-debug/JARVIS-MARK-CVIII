@@ -32,6 +32,11 @@ _PROTECTED_FILES = {
     "server_security.py",
     "security_audit.py",
     "self_edit.py",
+    "rust_bridge.py",
+    "skills_engine.py",
+    "self_evolution.py",
+    "main.py",
+    "ui.py",
 }
 
 

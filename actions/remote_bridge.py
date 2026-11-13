@@ -285,6 +285,11 @@ class TelegramRemoteBridge:
 
                         text = msg.get("text", "").strip()
 
+                        # Rate limit ALL incoming chat IDs BEFORE auth/pairing to block /auth brute-force
+                        if not check_rate_limit(f"tg_{chat_id}"):
+                            self._send_reply(chat_id, "⚠️ RATE LIMIT EXCEEDED: Please pause before sending additional commands.")
+                            continue
+
                         # Security Shield: Enforce Authorization & Pairing Passkey
                         if not is_remote_client_authorized(chat_id):
                             if text.startswith("/auth ") or text.startswith("auth "):
@@ -297,11 +302,6 @@ class TelegramRemoteBridge:
                             else:
                                 log_security_event("UNAUTHORIZED_ACCESS_BLOCKED", "WARN", f"Blocked unauthorized message from chat ID {chat_id}: '{text[:30]}'", client_id=str(chat_id))
                                 self._send_reply(chat_id, f"⛔ ACCESS RESTRICTED: J.A.R.V.I.S. is locked to authorized users. If you are the owner, send `/auth <passkey>` to pair this device.")
-                            continue
-
-                        # Rate limit check
-                        if not check_rate_limit(str(chat_id)):
-                            self._send_reply(chat_id, "⚠️ RATE LIMIT EXCEEDED: Please pause before sending additional commands.")
                             continue
 
                         # Check if System is in Protocol Blackout Lockout
@@ -322,8 +322,8 @@ class TelegramRemoteBridge:
                             self._send_reply(chat_id, b_res["message"])
                             continue
 
-                        # Check for 3-digit Destructive Challenge confirmation code
-                        if text.isdigit() and len(text) == 3:
+                        # Check for 6-digit (or legacy 3-digit) Destructive Challenge confirmation code
+                        if text.isdigit() and len(text) in (3, 6):
                             guard = get_destructive_action_guard()
                             ok, res_action, ch_msg = guard.verify_challenge(text)
                             if ok:
@@ -333,12 +333,12 @@ class TelegramRemoteBridge:
                                 self._send_reply(chat_id, ch_msg)
                                 continue
 
-                        # Prompt Injection & Document Jailbreak Shield
+                        # Prompt Injection & Document Jailbreak Shield — block execution completely on unsafe input
                         if text:
-                            is_safe, sanitized_text, matched = PromptInjectionShield.inspect(text, source=f"telegram_{chat_id}")
+                            is_safe, _sanitized_text, matched = PromptInjectionShield.inspect(text, source=f"telegram_{chat_id}")
                             if not is_safe:
-                                self._send_reply(chat_id, "🛡️ SECURITY SHIELD: Potential prompt injection / adversarial pattern detected. Content neutralized.")
-                                text = sanitized_text
+                                self._send_reply(chat_id, "🛡️ SECURITY SHIELD: Adversarial prompt injection or secret-exfiltration pattern blocked. Command rejected.")
+                                continue
 
                         # 1. Handle Voice Notes
                         if "voice" in msg or "audio" in msg:
@@ -476,9 +476,14 @@ class TelegramRemoteBridge:
                 dl_url = f"https://api.telegram.org/file/bot{self.bot_token}/{f_path}"
                 doc_data = requests.get(dl_url, timeout=12).content
 
-                # Save to downloads
-                save_p = BASE_DIR / "downloads" / file_name
-                save_p.parent.mkdir(parents=True, exist_ok=True)
+                # Save strictly inside downloads/ directory (prevent path traversal via crafted file_name)
+                downloads_root = (BASE_DIR / "downloads").resolve()
+                downloads_root.mkdir(parents=True, exist_ok=True)
+                safe_name = Path(str(file_name)).name.strip().lstrip(".") or "uploaded_file"
+                save_p = (downloads_root / safe_name).resolve()
+                if not save_p.is_relative_to(downloads_root):
+                    self._send_reply(chat_id, "⛔ Blocked unsafe document filename (path traversal rejected).")
+                    return
                 save_p.write_bytes(doc_data)
 
                 self._send_reply(chat_id, f"📥 Document saved to laptop: {save_p.name}")

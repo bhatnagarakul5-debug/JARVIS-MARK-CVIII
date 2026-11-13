@@ -41,7 +41,8 @@ HEAL_LOG = BASE_DIR / "memory" / "self_heal.log"
 HEAL_PROTECTED = {
     "self_edit", "security_shield", "remote_bridge", "anti_shoulder_surfer",
     "file_controller", "security_footage", "send_message", "whatsapp_reader",
-    "email_compose", "make_call", "call_manager",
+    "email_compose", "make_call", "call_manager", "server_security",
+    "rust_bridge", "skills_engine", "self_evolution",
 }
 
 
@@ -169,6 +170,14 @@ def _verify_skill_file(name: str) -> Tuple[bool, str]:
         return False, f"syntax error: {e}"
     if f"def {name}" not in code:
         return False, "entrypoint function missing"
+    try:
+        from core.rust_bridge import audit_generated_python_safety
+        safe_ok, findings = audit_generated_python_safety(code)
+        if not safe_ok:
+            path.unlink(missing_ok=True)
+            return False, f"security audit blocked unsafe constructs: {findings}"
+    except Exception:
+        pass
     return True, "ok"
 
 
@@ -412,6 +421,17 @@ def heal_module(module_stem: str, error_text: str, tb_text: str = "", player=Non
     if missing:
         _heal_log(f"{module_stem}: rejected (removed functions {missing})")
         return False, f"Patch removed functions {sorted(missing)}; rejected."
+    try:
+        from core.rust_bridge import audit_generated_python_safety
+        safe_ok, findings = audit_generated_python_safety(patched)
+        if not safe_ok:
+            orig_ok, orig_findings = audit_generated_python_safety(original)
+            new_risks = [f for f in findings if f not in orig_findings]
+            if new_risks:
+                _heal_log(f"{module_stem}: rejected unsafe patch constructs {new_risks}")
+                return False, f"Patch introduced unsafe constructs {new_risks}; rejected."
+    except Exception:
+        pass
     if patched.strip() == original.strip():
         return False, "AI found no change to make."
 

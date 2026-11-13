@@ -114,13 +114,14 @@ def brightness_up():
                 capture_output=True).returncode == 0:
             subprocess.run(["brightnessctl", "set", "+10%"], capture_output=True)
         else:
-            subprocess.run(
-                'xrandr --output $(xrandr | grep " connected" | head -1 | cut -d " " -f1)'
-                ' --brightness $(python3 -c "import subprocess; '
-                'b=float(subprocess.check_output([\"xrandr\",\"--verbose\"]).decode()'
-                '.split(\"Brightness:\")[1].split()[0]); print(min(1.0,b+0.1))")',
-                shell=True, capture_output=True
-            )
+            try:
+                xr = subprocess.check_output(["xrandr", "--verbose"], text=True, timeout=3)
+                disp = next((ln.split()[0] for ln in xr.splitlines() if " connected" in ln), None)
+                cur_b = float(xr.split("Brightness:")[1].split()[0])
+                if disp:
+                    subprocess.run(["xrandr", "--output", disp, "--brightness", f"{min(1.0, cur_b + 0.1):.2f}"], capture_output=True)
+            except Exception:
+                pass
     else:
         try:
             subprocess.run(
@@ -143,13 +144,14 @@ def brightness_down():
                 capture_output=True).returncode == 0:
             subprocess.run(["brightnessctl", "set", "10%-"], capture_output=True)
         else:
-            subprocess.run(
-                'xrandr --output $(xrandr | grep " connected" | head -1 | cut -d " " -f1)'
-                ' --brightness $(python3 -c "import subprocess; '
-                'b=float(subprocess.check_output([\"xrandr\",\"--verbose\"]).decode()'
-                '.split(\"Brightness:\")[1].split()[0]); print(max(0.1,b-0.1))")',
-                shell=True, capture_output=True
-            )
+            try:
+                xr = subprocess.check_output(["xrandr", "--verbose"], text=True, timeout=3)
+                disp = next((ln.split()[0] for ln in xr.splitlines() if " connected" in ln), None)
+                cur_b = float(xr.split("Brightness:")[1].split()[0])
+                if disp:
+                    subprocess.run(["xrandr", "--output", disp, "--brightness", f"{max(0.1, cur_b - 0.1):.2f}"], capture_output=True)
+            except Exception:
+                pass
     else:
         try:
             subprocess.run(

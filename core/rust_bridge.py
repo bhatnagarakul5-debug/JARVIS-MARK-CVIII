@@ -107,6 +107,74 @@ def inspect_prompt_injection(text: str) -> Tuple[bool, List[str]]:
     return True, []
 
 
+def check_rate_limit(
+    bucket_id: str,
+    client_id: str,
+    max_calls: int = 15,
+    window_secs: float = 60.0,
+    now_secs: Optional[float] = None,
+    max_clients: int = 2048,
+) -> Tuple[bool, int]:
+    import time
+
+    ts = float(now_secs) if now_secs is not None else time.time()
+    if is_rust_active() and hasattr(_rust_core, "check_rate_limit_rust"):
+        allowed, rem = _rust_core.check_rate_limit_rust(
+            str(bucket_id),
+            str(client_id),
+            int(max_calls),
+            float(window_secs),
+            ts,
+            int(max_clients),
+        )
+        return bool(allowed), int(rem)
+    return True, int(max_calls)
+
+
+def reset_rate_limit_bucket(bucket_id: str) -> bool:
+    if is_rust_active() and hasattr(_rust_core, "reset_rate_limit_bucket_rust"):
+        return bool(_rust_core.reset_rate_limit_bucket_rust(str(bucket_id)))
+    return False
+
+
+def validate_path_safety(
+    resolved_path: Union[str, Path],
+    file_name: str,
+    ext: str,
+    system_root: str = "C:/Windows",
+    for_write_or_delete: bool = False,
+) -> Tuple[bool, str]:
+    if is_rust_active() and hasattr(_rust_core, "validate_path_safety_rust"):
+        ok, msg = _rust_core.validate_path_safety_rust(
+            str(resolved_path),
+            str(file_name),
+            str(ext),
+            str(system_root),
+            bool(for_write_or_delete),
+        )
+        return bool(ok), str(msg)
+    return True, "Path verified safe."
+
+
+def audit_generated_python_safety(code: str) -> Tuple[bool, List[str]]:
+    if is_rust_active() and hasattr(_rust_core, "audit_generated_python_safety_rust"):
+        ok, findings = _rust_core.audit_generated_python_safety_rust(code or "")
+        return bool(ok), list(findings)
+    return True, []
+
+
+def parse_natural_reminder(query: str) -> Tuple[Optional[str], Optional[str], str]:
+    import time
+    from datetime import datetime
+
+    if is_rust_active() and hasattr(_rust_core, "parse_natural_reminder_rust"):
+        offset = int(datetime.now().astimezone().utcoffset().total_seconds())
+        now_local = int(time.time()) + offset
+        d_s, t_s, msg = _rust_core.parse_natural_reminder_rust(query or "", now_local)
+        return d_s, t_s, str(msg)
+    return None, None, "Reminder"
+
+
 # ============================================================================
 # 2. DOCUMENT QA: HEADER TRUNCATOR, MATH, CITATIONS, CLAIMS & HUMANIZER SCRUBBER
 # ============================================================================
@@ -879,11 +947,15 @@ def ghost_protocol(parameters: dict = None, player=None) -> str:
     return "Ghost Protocol engaged, Akul. All windows minimized, audio muted, and clipboard cleared. You are completely in stealth mode."
 
 
+import threading as _threading
+
+_STATE_LOCK = _threading.Lock()
 _WAR_MODE_ACTIVE = False
 
 
 def is_war_mode_active() -> bool:
-    return _WAR_MODE_ACTIVE
+    with _STATE_LOCK:
+        return _WAR_MODE_ACTIVE
 
 
 def war_mode_control(parameters: dict, player=None) -> str:
@@ -893,7 +965,8 @@ def war_mode_control(parameters: dict, player=None) -> str:
     app_name = (params.get("app_name") or "").strip()
 
     if action in ("activate", "enable", "start", "on"):
-        _WAR_MODE_ACTIVE = True
+        with _STATE_LOCK:
+            _WAR_MODE_ACTIVE = True
         if player and hasattr(player, "set_war_theme"):
             player.set_war_theme(True)
         set_process_priority("high")
@@ -903,7 +976,8 @@ def war_mode_control(parameters: dict, player=None) -> str:
             )
         return "House Party Protocol engaged. Power diverted to tactical systems, Akul. All subsystems locked and loaded."
     elif action in ("deactivate", "disable", "stop", "off"):
-        _WAR_MODE_ACTIVE = False
+        with _STATE_LOCK:
+            _WAR_MODE_ACTIVE = False
         if player and hasattr(player, "set_war_theme"):
             player.set_war_theme(False)
         set_process_priority("above_normal")
@@ -920,9 +994,11 @@ def war_mode_control(parameters: dict, player=None) -> str:
         res = open_app({"app_name": app_name}, response=None, player=player)
         return f"Deploying {app_name} under War Mode high-priority protocol, Akul. {res or ''}".strip()
     elif action == "status":
+        with _STATE_LOCK:
+            active = _WAR_MODE_ACTIVE
         status_str = (
             "ENGAGED (Crimson Tactical HUD & Maximum Performance)"
-            if _WAR_MODE_ACTIVE
+            if active
             else "STANDBY (Standard Protocol)"
         )
         return f"War Protocol Status: {status_str}."
@@ -933,12 +1009,14 @@ _cooldown_active = False
 
 
 def is_cooldown_active() -> bool:
-    return _cooldown_active
+    with _STATE_LOCK:
+        return _cooldown_active
 
 
 def set_cooldown_mode(active: bool, player=None) -> str:
     global _cooldown_active
-    _cooldown_active = bool(active)
+    with _STATE_LOCK:
+        _cooldown_active = bool(active)
     if active:
         trim_working_set_ram()
         set_process_priority("below_normal")
@@ -971,14 +1049,18 @@ def check_and_apply_cooldown(cpu_threshold: float = 85.0, player=None) -> dict:
 
     cpu_load = psutil.cpu_percent(interval=0.2)
     ram_load = psutil.virtual_memory().percent
-    if cpu_load >= cpu_threshold and not _cooldown_active:
+    with _STATE_LOCK:
+        currently_active = _cooldown_active
+    if cpu_load >= cpu_threshold and not currently_active:
         set_cooldown_mode(True, player=player)
-    elif cpu_load < 60.0 and _cooldown_active:
+    elif cpu_load < 60.0 and currently_active:
         set_cooldown_mode(False, player=player)
+    with _STATE_LOCK:
+        final_active = _cooldown_active
     return {
         "cpu_percent": cpu_load,
         "ram_percent": ram_load,
-        "cooldown_active": _cooldown_active,
+        "cooldown_active": final_active,
     }
 
 
@@ -1000,15 +1082,15 @@ def cooldown_control(parameters: dict, player=None) -> str:
         res = check_and_apply_cooldown(cpu_threshold=threshold, player=player)
         status_str = "ACTIVE" if res["cooldown_active"] else "INACTIVE"
         return f"CPU Load: {res['cpu_percent']}% | RAM: {res['ram_percent']}% | Cooldown Status: {status_str}"
+    with _STATE_LOCK:
+        is_cd = _cooldown_active
     status_str = (
         "ACTIVE (Eco Power Throttled)"
-        if _cooldown_active
+        if is_cd
         else "INACTIVE (Standard Eco)"
     )
     return f"CPU Thermal Cooldown Protocol Status: {status_str}. Current CPU Load: {psutil.cpu_percent()}%."
 
-
-import threading as _threading
 
 _focus_active = False
 _focus_stop_event = _threading.Event()
@@ -1016,7 +1098,8 @@ _focus_end_time = None
 
 
 def is_focus_active() -> bool:
-    return _focus_active
+    with _STATE_LOCK:
+        return _focus_active
 
 
 def focus_mode(parameters: dict, player=None, speak=None) -> str:
@@ -1026,20 +1109,22 @@ def focus_mode(parameters: dict, player=None, speak=None) -> str:
     params = parameters or {}
     action = (params.get("action") or "start").lower()
     if action == "start":
-        if _focus_active:
-            return "Sir, focus mode is already active."
-        try:
-            duration = int(params.get("duration", 25))
-        except ValueError:
-            duration = 25
-        _focus_active = True
-        _focus_stop_event.clear()
-        _focus_end_time = time.time() + (duration * 60)
+        with _STATE_LOCK:
+            if _focus_active:
+                return "Sir, focus mode is already active."
+            try:
+                duration = int(params.get("duration", 25))
+            except ValueError:
+                duration = 25
+            _focus_active = True
+            _focus_stop_event.clear()
+            _focus_end_time = time.time() + (duration * 60)
 
         def _worker():
             global _focus_active
             stopped = _focus_stop_event.wait(duration * 60)
-            _focus_active = False
+            with _STATE_LOCK:
+                _focus_active = False
             if not stopped:
                 msg = f"Focus session complete, sir. You worked for {duration} minutes."
                 if speak:
@@ -1059,11 +1144,12 @@ def focus_mode(parameters: dict, player=None, speak=None) -> str:
             player.write_log(f"Started focus mode for {duration} minutes.")
         return f"Focus mode activated for {duration} minutes, sir. I will minimize distractions."
     elif action == "stop":
-        if not _focus_active:
-            return "Focus mode is not currently active, sir."
-        _focus_stop_event.set()
-        _focus_active = False
-        _focus_end_time = None
+        with _STATE_LOCK:
+            if not _focus_active:
+                return "Focus mode is not currently active, sir."
+            _focus_stop_event.set()
+            _focus_active = False
+            _focus_end_time = None
         if player and hasattr(player, "set_state"):
             player.set_state("Idle")
         if player and hasattr(player, "write_log"):
@@ -1166,12 +1252,16 @@ def start_clipboard_monitor():
     import pyperclip
 
     global _clip_monitor_active
-    if _clip_monitor_active:
-        return
-    _clip_monitor_active = True
+    with _STATE_LOCK:
+        if _clip_monitor_active:
+            return
+        _clip_monitor_active = True
 
     def _clip_loop():
-        while _clip_monitor_active:
+        while True:
+            with _STATE_LOCK:
+                if not _clip_monitor_active:
+                    break
             try:
                 cur = pyperclip.paste()
                 if cur:
@@ -1521,6 +1611,282 @@ class ClaimVerifier:
                     )
                 )
         return issues
+
+
+# ============================================================================
+# 10. VOICE MACROS, ARCHIVE INTEL, AUTONOMOUS WATCHDOG & PARALLEL ORCHESTRATOR
+# ============================================================================
+
+def execute_voice_macro(parameters: dict, player=None) -> str:
+    """Executes workstation macros planned in `jarvis_rust_core` without shell calls."""
+    import time
+    import webbrowser
+
+    params = parameters or {}
+    macro_raw = (params.get("macro_name") or params.get("action") or "editing_mode").strip()
+    if is_rust_active() and hasattr(_rust_core, "plan_voice_macro_rust"):
+        macro_norm, steps, msg, notif_title, notif_level = _rust_core.plan_voice_macro_rust(macro_raw)
+    else:
+        macro_norm = macro_raw.lower().replace(" ", "_")
+        steps = []
+        msg = f"Unknown macro '{macro_norm}'. Available macros: editing_mode, coding_mode, gaming_mode."
+        notif_title, notif_level = "", ""
+
+    if player and hasattr(player, "write_log"):
+        player.write_log(f"MACRO: Initiating workstation macro '{macro_norm}'...")
+
+    for step in steps:
+        if step.startswith("audio:"):
+            dev = step.split(":", 1)[1]
+            try:
+                from actions.audio_device_manager import audio_device_mgr
+                audio_device_mgr.set_output_device(dev)
+            except Exception:
+                pass
+        elif step.startswith("app:"):
+            app_name = step.split(":", 1)[1]
+            try:
+                from actions.open_app import open_app
+                open_app({"app_name": app_name}, player=player)
+            except Exception:
+                pass
+        elif step == "spotify_liked":
+            try:
+                webbrowser.open("spotify:user:liked")
+                time.sleep(1.0)
+                if player and hasattr(player, "write_log"):
+                    player.write_log("MACRO: Launched Spotify Liked Songs playlist.")
+            except Exception:
+                try:
+                    from actions.open_app import open_app
+                    open_app({"app_name": "Spotify"}, player=player)
+                except Exception:
+                    pass
+        elif step.startswith("focus:"):
+            try:
+                mins = int(step.split(":", 1)[1])
+                focus_mode({"action": "start", "duration": mins}, player=player)
+            except Exception:
+                pass
+
+    if notif_title and player and hasattr(player, "push_notification"):
+        player.push_notification(notif_title, notif_level or "info")
+    return msg
+
+
+def archive_intel(parameters: dict, player=None) -> str:
+    """Internet Archive & Wayback Machine Intelligence Engine backed by Rust URL builder."""
+    import json
+    import urllib.request
+
+    params = parameters or {}
+    action = (params.get("action") or "wayback").lower().strip()
+    url_target = (params.get("url") or params.get("target") or "").strip()
+    query = (params.get("query") or "").strip()
+
+    if player and hasattr(player, "write_log"):
+        player.write_log(f"ARCHIVE: Executing archive_intel action='{action}' url='{url_target}' query='{query}'")
+
+    if "wayback" in action or "snapshot" in action or (url_target and not query):
+        if not url_target:
+            return "Please provide a URL to look up on the Wayback Machine, sir."
+        api_url = (
+            _rust_core.build_archive_url_rust("wayback", url_target)
+            if is_rust_active() and hasattr(_rust_core, "build_archive_url_rust")
+            else f"https://archive.org/wayback/available?url={url_target}"
+        )
+        try:
+            req = urllib.request.Request(api_url, headers={"User-Agent": "JARVIS-Mark-108"})
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                data = json.loads(resp.read().decode("utf-8"))
+            snapshots = data.get("archived_snapshots", {})
+            closest = snapshots.get("closest")
+            if closest and closest.get("available"):
+                snap_url = closest.get("url", "")
+                ts = closest.get("timestamp", "")
+                date_str = f"{ts[:4]}-{ts[4:6]}-{ts[6:8]}" if len(ts) >= 8 else ts
+                msg = f"Wayback Machine Snapshot found for {url_target} (from {date_str}): {snap_url}"
+                if player and hasattr(player, "write_log"):
+                    player.write_log(f"ARCHIVE: {msg}")
+                return msg
+            return f"No public Wayback Machine snapshots currently found for {url_target}, sir."
+        except Exception as e:
+            return f"Wayback Machine lookup error: {e}"
+
+    search_term = query or url_target
+    if not search_term:
+        return "Please provide a search query for The Internet Archive, sir."
+    api_url = (
+        _rust_core.build_archive_url_rust("search", search_term)
+        if is_rust_active() and hasattr(_rust_core, "build_archive_url_rust")
+        else f"https://archive.org/advancedsearch.php?q={search_term}&rows=5&output=json"
+    )
+    try:
+        req = urllib.request.Request(api_url, headers={"User-Agent": "JARVIS-Mark-108"})
+        with urllib.request.urlopen(req, timeout=12) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+        docs = data.get("response", {}).get("docs", [])
+        if not docs:
+            return f"No Internet Archive records found matching '{search_term}', sir."
+        lines = [f"Internet Archive Intelligence for '{search_term}':"]
+        for i, doc in enumerate(docs, 1):
+            title = doc.get("title", "Untitled")
+            ident = doc.get("identifier", "")
+            mtype = doc.get("mediatype", "unknown")
+            year = doc.get("year", "N/A")
+            creator = doc.get("creator", "Unknown")
+            if isinstance(creator, list):
+                creator = ", ".join(creator)
+            lines.append(f"{i}. [{mtype.upper()}] {title} ({year}) by {creator} — https://archive.org/details/{ident}")
+        res_str = "\n".join(lines)
+        if player and hasattr(player, "write_log"):
+            player.write_log(f"ARCHIVE: Found {len(docs)} items for '{search_term}'.")
+        return res_str
+    except Exception as e:
+        return f"Internet Archive search error: {e}"
+
+
+class AutonomousWatchdog:
+    """Background Auto-Healing & Telemetry Health Guardian backed by Rust TCP probe."""
+
+    def __init__(self):
+        self.is_running = False
+        self.reconnect_callback = None
+        self.last_network_ok = True
+
+    def start_watchdog(self, reconnect_callback=None, player=None):
+        import gc
+        import time
+        import psutil
+
+        if self.is_running:
+            return
+        self.is_running = True
+        self.reconnect_callback = reconnect_callback
+
+        def _watchdog_loop():
+            while self.is_running:
+                time.sleep(5)
+                try:
+                    mem_pct = psutil.virtual_memory().percent
+                    if mem_pct > 90.0:
+                        gc.collect()
+                        trim_working_set_ram()
+                        if player and hasattr(player, "write_log"):
+                            player.write_log(f"WATCHDOG: 🧹 RAM usage at {mem_pct:.1f}% -- Executed memory garbage collection.")
+                    net_ok = self._check_internet()
+                    if not net_ok and self.last_network_ok:
+                        self.last_network_ok = False
+                        if player and hasattr(player, "write_log"):
+                            player.write_log("WATCHDOG: ⚠️ Wi-Fi network drop detected -- Standing by for auto-healing...")
+                    elif net_ok and not self.last_network_ok:
+                        self.last_network_ok = True
+                        if player and hasattr(player, "write_log"):
+                            player.write_log("WATCHDOG: ✅ Network restored! Auto-healing live audio connection...")
+                        if self.reconnect_callback:
+                            try:
+                                self.reconnect_callback()
+                            except Exception:
+                                pass
+                except Exception:
+                    pass
+
+        _threading.Thread(target=_watchdog_loop, daemon=True).start()
+
+    def _check_internet(self) -> bool:
+        return check_online()
+
+    def stop(self):
+        self.is_running = False
+
+
+autonomous_watchdog = AutonomousWatchdog()
+
+
+class ParallelOrchestrator:
+    """Asynchronous worker pool manager with Rust-formatted status telemetry."""
+
+    _instance = None
+
+    def __new__(cls):
+        from concurrent.futures import ThreadPoolExecutor
+
+        if cls._instance is None:
+            cls._instance = super().__new__(cls)
+            cls._instance.executor = ThreadPoolExecutor(
+                max_workers=6, thread_name_prefix="Mark108_CVIII_SubBrain"
+            )
+            cls._instance.active_tasks = {}
+            cls._instance.completed_tasks = {}
+            cls._instance._lock = _threading.Lock()
+        return cls._instance
+
+    def submit_task(self, name: str, fn, args=(), kwargs=None, callback=None) -> str:
+        import time
+        import uuid
+
+        task_id = str(uuid.uuid4())[:8]
+        kwargs = kwargs or {}
+        with self._lock:
+            self.active_tasks[task_id] = {
+                "name": name,
+                "start_time": time.time(),
+                "status": "RUNNING",
+            }
+
+        def _wrapper():
+            try:
+                res = fn(*args, **kwargs)
+                with self._lock:
+                    self.active_tasks.pop(task_id, None)
+                    self.completed_tasks[task_id] = {
+                        "name": name,
+                        "result": str(res),
+                        "status": "COMPLETED",
+                        "end_time": time.strftime("%I:%M:%S %p"),
+                    }
+                    # Keep completed history bounded
+                    if len(self.completed_tasks) > 100:
+                        oldest = next(iter(self.completed_tasks))
+                        self.completed_tasks.pop(oldest, None)
+                if callback:
+                    try:
+                        callback(res)
+                    except Exception:
+                        pass
+                return res
+            except Exception as e:
+                with self._lock:
+                    self.active_tasks.pop(task_id, None)
+                    self.completed_tasks[task_id] = {
+                        "name": name,
+                        "result": f"Task error: {e}",
+                        "status": "FAILED",
+                        "end_time": time.strftime("%I:%M:%S %p"),
+                    }
+
+        self.executor.submit(_wrapper)
+        return f"Sub-Brain Task '{name}' [ID: #{task_id}] dispatched to parallel thread."
+
+    def list_active_tasks(self) -> str:
+        import time
+
+        now = time.time()
+        with self._lock:
+            running = [(t["name"], int(max(0, now - t["start_time"]))) for t in self.active_tasks.values()]
+            done = [
+                (t["name"], t["status"], t["end_time"])
+                for t in list(self.completed_tasks.values())[-5:]
+            ]
+        if is_rust_active() and hasattr(_rust_core, "format_parallel_tasks_rust"):
+            return _rust_core.format_parallel_tasks_rust(running, done)
+        if not running and not done:
+            return "Mark 108 Parallel Orchestrator: All background sub-brain workers idle."
+        return f"Running: {len(running)} | Completed: {len(done)}"
+
+
+parallel_orchestrator = ParallelOrchestrator()
+
 
 
 

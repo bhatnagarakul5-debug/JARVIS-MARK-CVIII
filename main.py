@@ -148,7 +148,7 @@ from actions.audio_device_manager import audio_device_control, audio_device_mgr
 
 from actions.news_intel import fetch_news_intel
 
-from actions.archive_intel import archive_intel
+from core.rust_bridge import archive_intel
 
 from actions.system_diagnostics import run_system_diagnostics
 
@@ -156,7 +156,7 @@ from actions.davinci_advanced import davinci_advanced_control
 
 from actions.security_shield import security_shield_control
 
-from actions.voice_macros import execute_voice_macro
+from core.rust_bridge import execute_voice_macro
 
 from actions.remote_bridge import remote_bridge_control
 
@@ -178,11 +178,11 @@ from actions.file_watcher import smart_file_watcher, file_watcher_control
 
 from actions.call_manager import call_manager_control
 
-from core.autonomous_watchdog import autonomous_watchdog
+from core.rust_bridge import autonomous_watchdog
 
 from core.skills_engine import mark_108_skills_control, mark_cviii_skills_control
 
-from core.parallel_orchestrator import parallel_orchestrator
+from core.rust_bridge import parallel_orchestrator
 
 from core.rust_bridge import offline_fallback
 

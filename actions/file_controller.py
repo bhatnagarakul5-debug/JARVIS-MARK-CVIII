@@ -237,17 +237,31 @@ def resolve_any_file(path_or_name: str, ext_hint: str = "") -> Path | None:
 
 
 def _is_path_allowed(target: Path, for_write_or_delete: bool = False) -> tuple[bool, str]:
-    """Protects critical credential files and OS system folders while allowing full laptop file access."""
+    """Protects critical credential files and OS system folders using unified `jarvis_rust_core` policy."""
     try:
-        resolved_str = str(target.resolve())
+        resolved = target.resolve()
+        resolved_str = str(resolved)
+        try:
+            from core.rust_bridge import validate_path_safety as _rust_path_ok, is_rust_active
+            if is_rust_active():
+                import os as _os
+                win_dir = _os.environ.get("SystemRoot", "C:/Windows")
+                ok_rust, msg_rust = _rust_path_ok(resolved, resolved.name, resolved.suffix, win_dir, for_write_or_delete)
+                if not ok_rust:
+                    return False, msg_rust
+        except Exception:
+            pass
+
         low = resolved_str.lower()
-        # Protect JARVIS credential/security files
+        # Protect JARVIS credential/security files & credential extensions
         for blocked_token in (
-            "api_keys.json", "integrity_baseline.json", "security_ledger",
-            "voice_profile.npy", ".ssh", "system32", "syswow64",
+            "api_keys.json", "credentials.json", "integrity_baseline.json", "security_ledger",
+            "voice_profile.npy", ".ssh", "system32", "syswow64", "id_rsa", "id_ed25519",
         ):
             if blocked_token in low:
                 return False, f"Access denied to protected security/system file: {target.name}"
+        if resolved.suffix.lower() in {".key", ".pem", ".pfx", ".p12", ".kdbx", ".env"}:
+            return False, f"Access denied to protected credential extension: {resolved.suffix}" 
         if for_write_or_delete:
             protected_roots = {
                 Path.home().resolve(),

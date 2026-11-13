@@ -11,12 +11,15 @@ from xml.sax.saxutils import escape as xml_escape
 
 def _parse_natural_query(query: str) -> tuple[str | None, str | None, str]:
     """
-    Parses natural reminder strings such as:
-      - 'in 15m call mom' / 'in 2 hours submit report'
-      - '18:30 review slides'
-      - '2026-11-03 18:30 review slides'
+    Parses natural reminder strings via `jarvis_rust_core` with Python fallback.
     Returns (date_str, time_str, message).
     """
+    try:
+        from core.rust_bridge import parse_natural_reminder as _rust_rem, is_rust_active
+        if is_rust_active():
+            return _rust_rem(query)
+    except Exception:
+        pass
     q = query.strip()
     now = datetime.now()
 
