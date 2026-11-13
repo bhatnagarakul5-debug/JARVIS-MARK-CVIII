@@ -126,7 +126,7 @@ from core.rust_bridge import clipboard_manager, start_clipboard_monitor
 
 from actions.scheduler         import schedule_task, start_scheduler
 
-from actions.tab_manager       import tab_manager
+from core.rust_bridge import tab_manager
 
 from actions.daily_briefing    import daily_briefing
 
@@ -146,11 +146,11 @@ from actions.auto_video_editor import auto_edit_video
 
 from actions.audio_device_manager import audio_device_control, audio_device_mgr
 
-from actions.news_intel import fetch_news_intel
+from core.rust_bridge import fetch_news_intel
 
 from core.rust_bridge import archive_intel
 
-from actions.system_diagnostics import run_system_diagnostics
+from core.rust_bridge import run_system_diagnostics
 
 from actions.davinci_advanced import davinci_advanced_control
 
@@ -168,7 +168,7 @@ from core.rust_bridge import war_mode_control
 
 from core.rust_bridge import ghost_protocol
 
-from actions.project_autopilot import create_project_workspace
+from core.rust_bridge import create_project_workspace
 
 from actions.antigravity_coder import antigravity_coder
 
@@ -200,13 +200,13 @@ from core.rust_bridge import (
 
 )
 
-from core.hardware_equilibrium import (
+from core.rust_bridge import (
 
     get_hardware_equilibrium_governor, handle_hardware_equilibrium_tool
 
 )
 
-from core.long_conversation import get_long_conversation_manager
+from core.rust_bridge import get_long_conversation_manager
 
 from core.humanizer import humanizer_tool
 

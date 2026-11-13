@@ -516,6 +516,64 @@ def test_rust_phase6_security_hardening_and_modules(tmp_path: Path):
     assert hasattr(autonomous_watchdog, "start_watchdog")
 
 
+def test_rust_phase7_deep_brain(tmp_path: Path):
+    """Tests Phase-7 Rust subsystems: hardware equilibrium tiers, RSS XML parser, bloat detector, top-hog table, project scaffolder, URL filter, hash-chained security log & port analyzer."""
+    import jarvis_rust_core
+    from core.rust_bridge import (
+        get_hardware_equilibrium_governor,
+        handle_hardware_equilibrium_tool,
+        get_long_conversation_manager,
+        fetch_news_intel,
+        run_system_diagnostics,
+        tab_manager,
+    )
+
+    # 1. Equilibrium tier evaluation
+    assert jarvis_rust_core.evaluate_hardware_equilibrium_rust(25.0, 40.0, 10.0, 10.0, 20.0) == ("OPTIMAL", 60)
+    assert jarvis_rust_core.evaluate_hardware_equilibrium_rust(92.0, 40.0, 10.0, 10.0, 20.0) == ("CRITICAL_RECOVERY", 15)
+    assert "Hardware Equilibrium Status" in handle_hardware_equilibrium_tool({"action": "status"})
+    assert hasattr(get_hardware_equilibrium_governor(), "balance_now")
+
+    # 2. Long conversation snippet & context assembly
+    snippet = jarvis_rust_core.compress_turn_snippet_rust("user", "Optimize JARVIS memory in Rust")
+    assert "Akul asked:" in snippet
+    ctx = jarvis_rust_core.format_long_conversation_context_rust(
+        "Rust Migration", ["Exoskeleton"], snippet, [("user", "Status?"), ("jarvis", "Nominal.")]
+    )
+    assert "[LONG-CONVERSATION MEMORY" in ctx and "Rust Migration" in ctx
+    assert hasattr(get_long_conversation_manager(), "record_turn")
+
+    # 3. RSS XML parser & Google News URL builder
+    rss_xml = '<rss><channel><item><title><![CDATA[Rust &amp; AI]]></title><link>https://example.com</link><pubDate>2026</pubDate></item></channel></rss>'
+    parsed = jarvis_rust_core.parse_rss_items_rust(rss_xml, 5)
+    assert len(parsed) == 1 and parsed[0][0] == "Rust & AI"
+    assert "q=quantum+ai" in jarvis_rust_core.build_google_news_rss_url_rust("quantum ai")
+    assert "Available Live News Channels" in fetch_news_intel({"action": "channels_list"})
+
+    # 4. System diagnostics & bloat checker
+    assert jarvis_rust_core.is_bloat_process_name_rust("wallpaperui.exe") is True
+    assert jarvis_rust_core.is_bloat_process_name_rust("python.exe") is False
+    table = jarvis_rust_core.format_top_resource_hogs_rust([("chrome.exe", 512.4, 101), ("code.exe", 800.1, 202)], 2)
+    assert "code.exe" in table.splitlines()[1]
+    assert "Top Memory-Consuming Processes" in run_system_diagnostics({"action": "top_processes", "count": 3})
+
+    # 5. Project workspace scaffolder in Rust & HTTP URL filter
+    ok, proj_dir, err, created = jarvis_rust_core.scaffold_project_workspace_rust(str(tmp_path), "Sovereign Test!", "python")
+    assert ok and not err and "main.py" in created and (tmp_path / "Sovereign_Test_" / "main.py").exists()
+    urls = jarvis_rust_core.filter_http_urls_rust(["https://example.com", "javascript:alert(1)", "http://localhost:8000"])
+    assert urls == ["https://example.com", "http://localhost:8000"]
+    assert "Unknown" in tab_manager({"action": "noop"})
+
+    # 6. Hash-chained security ledger & exposed ports analyzer
+    slog = tmp_path / "sec_chain.log"
+    h1 = jarvis_rust_core.append_chained_security_event_rust(str(slog), "2026-11-13", "INFO", "BOOT", "local", "Init")
+    h2 = jarvis_rust_core.append_chained_security_event_rust(str(slog), "2026-11-13", "WARN", "TEST", "local", "Check")
+    assert len(h1) == 16 and len(h2) == 16 and h1 != h2
+    ptrs = jarvis_rust_core.analyze_exposed_ports_rust([445, 7680], [6463])
+    assert any("445" in t for t, _, _, _ in ptrs)
+
+
+
 
 
 

@@ -3373,15 +3373,380 @@ fn format_parallel_tasks_rust(
     lines.join("\n")
 }
 
+// ============================================================================
+// 12. PHASE-7 DEEP BRAIN: EQUILIBRIUM, LONG-CONV, NEWS RSS, DIAGNOSTICS, PROJECTS, SECURITY CHAIN
+// ============================================================================
+
+#[pyfunction]
+fn evaluate_hardware_equilibrium_rust(cpu: f64, ram: f64, gpu: f64, vram: f64, ping_ms: f64) -> (String, u32) {
+    let peak = cpu.max(ram).max(gpu).max(vram);
+    if peak >= 85.0 || ping_ms > 1500.0 {
+        ("CRITICAL_RECOVERY".to_string(), 15)
+    } else if peak >= 75.0 {
+        ("THROTTLED".to_string(), 30)
+    } else if peak >= 60.0 {
+        ("BALANCED".to_string(), 45)
+    } else {
+        ("OPTIMAL".to_string(), 60)
+    }
+}
+
+#[pyfunction]
+fn measure_tcp_latency_ms_rust(host: &str, port: u16, timeout_ms: u64) -> (bool, f64, String) {
+    use std::net::{TcpStream, ToSocketAddrs};
+    use std::time::{Duration, Instant};
+
+    let target = format!("{}:{}", host.trim(), port);
+    let start = Instant::now();
+    let timeout = Duration::from_millis(timeout_ms.max(200));
+    if let Ok(mut addrs) = target.to_socket_addrs() {
+        if let Some(addr) = addrs.next() {
+            if let Ok(stream) = TcpStream::connect_timeout(&addr, timeout) {
+                let elapsed = (start.elapsed().as_secs_f64() * 1000.0).max(1.0);
+                let local_ip = stream
+                    .local_addr()
+                    .map(|a| a.ip().to_string())
+                    .unwrap_or_else(|_| "127.0.0.1".to_string());
+                let _ = stream.shutdown(std::net::Shutdown::Both);
+                return (true, (elapsed * 10.0).round() / 10.0, local_ip);
+            }
+        }
+    }
+    (false, 999.0, "127.0.0.1".to_string())
+}
+
+#[pyfunction]
+fn compress_turn_snippet_rust(role: &str, text: &str) -> String {
+    let prefix = if role == "user" { "Akul asked" } else { "JARVIS explained" };
+    let clean = text.replace('\n', " ");
+    let snippet: String = clean.trim().chars().take(120).collect();
+    if snippet.is_empty() {
+        String::new()
+    } else {
+        format!("- {}: \"{}...\"", prefix, snippet)
+    }
+}
+
+#[pyfunction]
+fn format_long_conversation_context_rust(
+    topic: &str,
+    subtopics: Vec<String>,
+    compressed_summary: &str,
+    recent_turns: Vec<(String, String)>,
+) -> String {
+    if recent_turns.is_empty() && compressed_summary.trim().is_empty() {
+        return String::new();
+    }
+    let mut parts = vec![
+        "[LONG-CONVERSATION MEMORY & ACTIVE THREAD CONTINUITY]".to_string(),
+        format!("Active Discussion Focus: {}", topic),
+    ];
+    if !subtopics.is_empty() {
+        let start = subtopics.len().saturating_sub(6);
+        parts.push(format!("Recent Subtopics Discussed: {}", subtopics[start..].join(", ")));
+    }
+    if !compressed_summary.trim().is_empty() {
+        parts.push(format!("Earlier Discussion Summary:\n{}", compressed_summary));
+    }
+    if !recent_turns.is_empty() {
+        parts.push("Immediate Prior Exchanges:".to_string());
+        let start = recent_turns.len().saturating_sub(6);
+        for (role, txt) in &recent_turns[start..] {
+            let speaker = if role == "user" { "Akul" } else { "JARVIS" };
+            let clean: String = txt.replace('\n', " ").trim().chars().take(180).collect();
+            parts.push(format!("  {}: {}", speaker, clean));
+        }
+    }
+    parts.push(
+        "MANDATE: Maintain seamless conversational continuity. Refer back to previously established facts, questions, and decisions naturally without asking Akul to repeat himself.".to_string(),
+    );
+    format!("{}\n\n", parts.join("\n"))
+}
+
+fn clean_xml_text(raw: &str) -> String {
+    let s = raw.trim();
+    let stripped = if let Some(inner) = s.strip_prefix("<![CDATA[").and_then(|x| x.strip_suffix("]]>")) {
+        inner
+    } else {
+        s
+    };
+    stripped
+        .replace("&amp;", "&")
+        .replace("&lt;", "<")
+        .replace("&gt;", ">")
+        .replace("&quot;", "\"")
+        .replace("&#39;", "'")
+        .replace("&apos;", "'")
+        .trim()
+        .to_string()
+}
+
+fn extract_tag_content<'a>(block: &'a str, tag: &str) -> String {
+    let open = format!("<{}", tag);
+    let close = format!("</{}>", tag);
+    if let Some(start_tag) = block.find(&open) {
+        let after_open = &block[start_tag + open.len()..];
+        if let Some(gt_idx) = after_open.find('>') {
+            let content_start = &after_open[gt_idx + 1..];
+            if let Some(end_idx) = content_start.find(&close) {
+                return clean_xml_text(&content_start[..end_idx]);
+            }
+        }
+    }
+    String::new()
+}
+
+#[pyfunction]
+fn parse_rss_items_rust(xml_text: &str, limit: usize) -> Vec<(String, String, String)> {
+    let mut items = Vec::new();
+    let mut cursor = xml_text;
+    while items.len() < limit {
+        let Some(item_start) = cursor.find("<item") else { break };
+        let after_item = &cursor[item_start..];
+        let Some(item_end) = after_item.find("</item>") else { break };
+        let block = &after_item[..item_end + 7];
+        let title = extract_tag_content(block, "title");
+        let link = extract_tag_content(block, "link");
+        let pub_date = extract_tag_content(block, "pubDate");
+        if !title.is_empty() {
+            items.push((title, link, pub_date));
+        }
+        cursor = &after_item[item_end + 7..];
+    }
+    items
+}
+
+#[pyfunction]
+fn build_google_news_rss_url_rust(query: &str) -> String {
+    format!(
+        "https://news.google.com/rss/search?q={}&hl=en-US&gl=US",
+        percent_encode_component(query.trim())
+    )
+}
+
+#[pyfunction]
+fn is_bloat_process_name_rust(name: &str) -> bool {
+    let low = name.trim().to_lowercase();
+    matches!(
+        low.as_str(),
+        "wallpaperui.exe"
+            | "lively.exe"
+            | "delloptimizer.thickclient.exe"
+            | "m365copilot.exe"
+            | "braveupdate.exe"
+            | "microsoftedgeupdate.exe"
+            | "logi_download_assistant.exe"
+            | "intelgraphicssoftware.overlay.exe"
+            | "xboxpctray.exe"
+    )
+}
+
+#[pyfunction]
+fn format_top_resource_hogs_rust(mut procs: Vec<(String, f64, u32)>, count: usize) -> String {
+    procs.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+    let mut lines = vec!["=== Top Memory-Consuming Processes ===".to_string()];
+    for (idx, (name, mem_mb, pid)) in procs.into_iter().take(count.max(1)).enumerate() {
+        let short_name: String = name.chars().take(26).collect();
+        lines.push(format!("{}. {:<26} | {:>7.1} MB | PID {}", idx + 1, short_name, mem_mb, pid));
+    }
+    lines.join("\n")
+}
+
+#[pyfunction]
+fn scaffold_project_workspace_rust(
+    projects_dir: &str,
+    project_name: &str,
+    project_type: &str,
+) -> (bool, String, String, Vec<String>) {
+    let clean_name: String = project_name
+        .chars()
+        .map(|c| if c.is_alphanumeric() || c == '-' || c == '_' { c } else { '_' })
+        .collect();
+    let final_name = if clean_name.is_empty() {
+        "New_Stark_Project".to_string()
+    } else {
+        clean_name
+    };
+    let target_dir = Path::new(projects_dir).join(&final_name);
+    if let Err(e) = fs::create_dir_all(&target_dir) {
+        return (false, target_dir.to_string_lossy().to_string(), e.to_string(), Vec::new());
+    }
+
+    let ptype = project_type.trim().to_lowercase();
+    let mut created_files: Vec<String> = Vec::new();
+    let write_res = || -> std::io::Result<()> {
+        if ptype == "python" {
+            let main_content = format!(
+                "\"\"\"\n{} — Created by JARVIS Project Auto-Pilot\n\"\"\"\n\ndef main():\n    print(\"JARVIS Project Auto-Pilot: Environment Ready!\")\n\nif __name__ == \"__main__\":\n    main()\n",
+                final_name
+            );
+            fs::write(target_dir.join("main.py"), main_content)?;
+            created_files.push("main.py".to_string());
+
+            let readme_content = format!(
+                "# {}\n\nAutomated workspace created by J.A.R.V.I.S. Mark 108 (MARK CVIII — Sovereign Core).\n",
+                final_name
+            );
+            fs::write(target_dir.join("README.md"), readme_content)?;
+            created_files.push("README.md".to_string());
+
+            fs::write(target_dir.join("requirements.txt"), "# Project Dependencies\n")?;
+            created_files.push("requirements.txt".to_string());
+        } else if matches!(ptype.as_str(), "davinci" | "video" | "editing") {
+            fs::create_dir_all(target_dir.join("Raw_Clips"))?;
+            fs::create_dir_all(target_dir.join("Audio_Music"))?;
+            fs::create_dir_all(target_dir.join("Exports"))?;
+            let notes = format!(
+                "# Video Project: {}\n\nFolder structure:\n- /Raw_Clips\n- /Audio_Music\n- /Exports\n",
+                final_name
+            );
+            fs::write(target_dir.join("PROJECT_NOTES.md"), notes)?;
+            created_files.extend([
+                "Raw_Clips/".to_string(),
+                "Audio_Music/".to_string(),
+                "Exports/".to_string(),
+                "PROJECT_NOTES.md".to_string(),
+            ]);
+        } else if matches!(ptype.as_str(), "web" | "html" | "js") {
+            let html = format!(
+                "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n  <meta charset=\"UTF-8\">\n  <title>{}</title>\n</head>\n<body>\n  <h1>{}</h1>\n</body>\n</html>\n",
+                final_name, final_name
+            );
+            fs::write(target_dir.join("index.html"), html)?;
+            fs::write(
+                target_dir.join("style.css"),
+                "/* Custom Styles */\nbody { background: #0a0a0a; color: #00f0ff; font-family: sans-serif; }\n",
+            )?;
+            created_files.extend(["index.html".to_string(), "style.css".to_string()]);
+        } else {
+            let readme = format!("# {}\n\nWorkspace created by JARVIS.\n", final_name);
+            fs::write(target_dir.join("README.md"), readme)?;
+            created_files.push("README.md".to_string());
+        }
+        Ok(())
+    }();
+
+    match write_res {
+        Ok(()) => (true, target_dir.to_string_lossy().to_string(), String::new(), created_files),
+        Err(e) => (false, target_dir.to_string_lossy().to_string(), e.to_string(), created_files),
+    }
+}
+
+#[pyfunction]
+fn filter_http_urls_rust(urls: Vec<String>) -> Vec<String> {
+    urls.into_iter()
+        .map(|u| u.trim().to_string())
+        .filter(|u| {
+            let low = u.to_lowercase();
+            (low.starts_with("http://") && u.len() > 7) || (low.starts_with("https://") && u.len() > 8)
+        })
+        .collect()
+}
+
+static LAST_SECURITY_HASH: OnceLock<std::sync::Mutex<String>> = OnceLock::new();
+
+#[pyfunction]
+fn append_chained_security_event_rust(
+    log_path: &str,
+    timestamp: &str,
+    severity: &str,
+    event_type: &str,
+    client_id: &str,
+    details: &str,
+) -> String {
+    use std::io::Write;
+    let mutex = LAST_SECURITY_HASH.get_or_init(|| std::sync::Mutex::new("GENESIS_MARK_108".to_string()));
+    let mut digest_short = String::new();
+    if let Ok(mut prev) = mutex.lock() {
+        let payload = format!("{}|{}|{}|{}|{}|{}", *prev, timestamp, severity, event_type, client_id, details);
+        let mut hasher = Sha256::new();
+        hasher.update(payload.as_bytes());
+        let full_hex = hex::encode(hasher.finalize());
+        digest_short = full_hex.chars().take(16).collect();
+        *prev = full_hex;
+    }
+
+    let p = Path::new(log_path);
+    if let Some(parent) = p.parent() {
+        let _ = fs::create_dir_all(parent);
+    }
+    let line = format!(
+        "[{}] [{}] [{}] Client: {} — {} [chain:{}]\n",
+        timestamp, severity, event_type, client_id, details, digest_short
+    );
+    if let Ok(mut f) = fs::OpenOptions::new().create(true).append(true).open(p) {
+        let _ = f.write_all(line.as_bytes());
+    }
+    digest_short
+}
+
+#[pyfunction]
+fn analyze_exposed_ports_rust(
+    exposed_ports: Vec<u16>,
+    safe_ports: Vec<u16>,
+) -> Vec<(String, String, String, String)> {
+    let exposed: HashSet<u16> = exposed_ports.into_iter().collect();
+    let safe: HashSet<u16> = safe_ports.into_iter().collect();
+    let mut pointers: Vec<(String, String, String, String)> = Vec::new();
+
+    if exposed.contains(&135) || exposed.contains(&445) {
+        pointers.push((
+            "Ports 135 / 445 (RPC & SMB File Sharing)".to_string(),
+            "MODERATE".to_string(),
+            "Windows RPC (135) and SMB (445) are listening on all interfaces (0.0.0.0 / ::).".to_string(),
+            "Ensure your active Wi-Fi profile is set to 'Public Network' in Windows Settings rather than 'Private'. This enables Windows Firewall's default block rule on inbound SMB/RPC traffic from other devices on campus or public Wi-Fi.".to_string(),
+        ));
+    }
+    if exposed.contains(&5040) {
+        pointers.push((
+            "Port 5040 (Connected Devices Service)".to_string(),
+            "LOW".to_string(),
+            "Windows svchost CDPUserSvc listening on 0.0.0.0:5040.".to_string(),
+            "Standard Microsoft Connected Devices service for multi-device sync (e.g. Phone Link). No external action required if Windows Firewall is enabled.".to_string(),
+        ));
+    }
+    if exposed.contains(&7680) {
+        pointers.push((
+            "Port 7680 (Delivery Optimization P2P)".to_string(),
+            "LOW".to_string(),
+            "Windows Delivery Optimization (WUDO) listening on ::7680.".to_string(),
+            "Turn off 'Allow downloads from other PCs' in Windows Settings > Windows Update > Advanced Options > Delivery Optimization to completely close this peer-to-peer port.".to_string(),
+        ));
+    }
+    if exposed.contains(&27036) {
+        pointers.push((
+            "Port 27036 (Steam Remote Play)".to_string(),
+            "LOW".to_string(),
+            "Steam client listening on 0.0.0.0:27036 for Remote Play LAN discovery.".to_string(),
+            "If you don't use Steam In-Home Remote Play, disable 'Enable Remote Play' in Steam Settings > Remote Play to close this network listener.".to_string(),
+        ));
+    }
+    if safe.contains(&6463) {
+        pointers.push((
+            "Port 6463 (Discord Local IPC)".to_string(),
+            "SECURE".to_string(),
+            "Discord RPC listening on 127.0.0.1:6463.".to_string(),
+            "Properly bound to loopback interface (127.0.0.1). Unreachable by external network devices.".to_string(),
+        ));
+    }
+    pointers.push((
+        "J.A.R.V.I.S. Telegram Remote Bridge".to_string(),
+        "CRITICAL HARDENING COMPLETED".to_string(),
+        "Telegram bot polling receives inbound commands over HTTPS.".to_string(),
+        "Strict chat ID whitelist authentication, pre-auth rate limiting, and Path Traversal protection have been enforced.".to_string(),
+    ));
+    pointers
+}
+
 #[pyfunction]
 fn rust_engine_info() -> HashMap<String, String> {
     let mut info = HashMap::new();
     info.insert("engine".to_string(), "jarvis_rust_core".to_string());
-    info.insert("version".to_string(), "108.6.0 (Sovereign Core Phase-6 Hardened Exoskeleton)".to_string());
+    info.insert("version".to_string(), "108.7.0 (Sovereign Core Phase-7 Deep Brain Exoskeleton)".to_string());
     info.insert("threads".to_string(), rayon::current_num_threads().to_string());
     info.insert(
         "subsystems".to_string(),
-        "security_seal, prompt_injection_shield, bounded_rate_limiter, path_safety_validator, python_code_safety_auditor, destructive_guard, win32_clipboard_wiper, clipboard_history_vault, git_secret_auditor, doc_scanner, doc_classifier, markdown_normalizer, bibliography_ungluer, source_authority_tiering, math_validator, spreadsheet_validator, citation_matcher, claim_classifier, claim_concordance_verifier, ai_detector, watermark_scrubber, camera_vision, face_histogram, audio_dsp, memory_bm25_vector, fast_file_search, win32_ram_trimmer, win32_process_priority, cpu_thread_governor, win32_ghost_protocol, pycache_cleaner, emotional_spectrum, human_reactions, conversation_topic_tracker, conversation_jsonl_logger, weather_url_builder, reminder_parser, voice_macro_planner, archive_url_builder, parallel_task_formatter, offline_win32_engine, self_evolution_parsers".to_string(),
+        "security_seal, prompt_injection_shield, bounded_rate_limiter, path_safety_validator, python_code_safety_auditor, chained_security_ledger, port_risk_analyzer, destructive_guard, win32_clipboard_wiper, clipboard_history_vault, git_secret_auditor, doc_scanner, doc_classifier, markdown_normalizer, bibliography_ungluer, source_authority_tiering, math_validator, spreadsheet_validator, citation_matcher, claim_classifier, claim_concordance_verifier, ai_detector, watermark_scrubber, camera_vision, face_histogram, audio_dsp, memory_bm25_vector, fast_file_search, win32_ram_trimmer, win32_process_priority, cpu_thread_governor, win32_ghost_protocol, hardware_equilibrium_engine, tcp_latency_probe, bloat_process_detector, diagnostics_formatter, project_scaffolder, long_conversation_engine, rss_xml_parser, url_filter, pycache_cleaner, emotional_spectrum, human_reactions, conversation_topic_tracker, conversation_jsonl_logger, weather_url_builder, reminder_parser, voice_macro_planner, archive_url_builder, parallel_task_formatter, offline_win32_engine, self_evolution_parsers".to_string(),
     );
     info
 }
@@ -3449,6 +3814,18 @@ fn jarvis_rust_core(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(plan_voice_macro_rust, m)?)?;
     m.add_function(wrap_pyfunction!(build_archive_url_rust, m)?)?;
     m.add_function(wrap_pyfunction!(format_parallel_tasks_rust, m)?)?;
+    m.add_function(wrap_pyfunction!(evaluate_hardware_equilibrium_rust, m)?)?;
+    m.add_function(wrap_pyfunction!(measure_tcp_latency_ms_rust, m)?)?;
+    m.add_function(wrap_pyfunction!(compress_turn_snippet_rust, m)?)?;
+    m.add_function(wrap_pyfunction!(format_long_conversation_context_rust, m)?)?;
+    m.add_function(wrap_pyfunction!(parse_rss_items_rust, m)?)?;
+    m.add_function(wrap_pyfunction!(build_google_news_rss_url_rust, m)?)?;
+    m.add_function(wrap_pyfunction!(is_bloat_process_name_rust, m)?)?;
+    m.add_function(wrap_pyfunction!(format_top_resource_hogs_rust, m)?)?;
+    m.add_function(wrap_pyfunction!(scaffold_project_workspace_rust, m)?)?;
+    m.add_function(wrap_pyfunction!(filter_http_urls_rust, m)?)?;
+    m.add_function(wrap_pyfunction!(append_chained_security_event_rust, m)?)?;
+    m.add_function(wrap_pyfunction!(analyze_exposed_ports_rust, m)?)?;
     m.add_function(wrap_pyfunction!(rust_engine_info, m)?)?;
     Ok(())
 }

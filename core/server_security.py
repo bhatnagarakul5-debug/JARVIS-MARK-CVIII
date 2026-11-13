@@ -56,6 +56,15 @@ def log_security_event(event_type: str, severity: str, details: str, client_id: 
             "client_id": str(client_id or "local"),
             "details": details
         }
+        try:
+            from core.rust_bridge import is_rust_active, _rust_core
+            if is_rust_active() and hasattr(_rust_core, "append_chained_security_event_rust"):
+                _rust_core.append_chained_security_event_rust(
+                    str(SECURITY_LOG_PATH), now_str, severity, event_type, entry["client_id"], details
+                )
+                return
+        except Exception:
+            pass
         with open(SECURITY_LOG_PATH, "a", encoding="utf-8") as f:
             f.write(f"[{now_str}] [{severity}] [{event_type}] Client: {entry['client_id']} — {details}\n")
     except Exception:
@@ -387,67 +396,17 @@ def scan_open_endpoints() -> Dict[str, Any]:
 
 
 def _generate_security_pointers(scan_results: Dict[str, Any]) -> List[Dict[str, str]]:
-    """Synthesizes actionable defensive hardening pointers based on active listeners."""
-    pointers = []
-
-    exposed = scan_results.get("exposed_listeners", [])
-    exposed_ports = {item["port"]: item for item in exposed}
-
-    # 1. Port 135 / 445 (Windows RPC / SMB)
-    if 135 in exposed_ports or 445 in exposed_ports:
-        pointers.append({
-            "target": "Ports 135 / 445 (RPC & SMB File Sharing)",
-            "risk_level": "MODERATE",
-            "observation": "Windows RPC (135) and SMB (445) are listening on all interfaces (0.0.0.0 / ::).",
-            "pointer": "Ensure your active Wi-Fi profile is set to 'Public Network' in Windows Settings rather than 'Private'. This enables Windows Firewall's default block rule on inbound SMB/RPC traffic from other devices on campus or public Wi-Fi."
-        })
-
-    # 2. Port 5040 (Windows Connected Devices Platform)
-    if 5040 in exposed_ports:
-        pointers.append({
-            "target": "Port 5040 (Connected Devices Service)",
-            "risk_level": "LOW",
-            "observation": "Windows svchost CDPUserSvc listening on 0.0.0.0:5040.",
-            "pointer": "Standard Microsoft Connected Devices service for multi-device sync (e.g. Phone Link). No external action required if Windows Firewall is enabled."
-        })
-
-    # 3. Port 7680 (Windows Update Delivery Optimization)
-    if 7680 in exposed_ports:
-        pointers.append({
-            "target": "Port 7680 (Delivery Optimization P2P)",
-            "risk_level": "LOW",
-            "observation": "Windows Delivery Optimization (WUDO) listening on ::7680.",
-            "pointer": "Turn off 'Allow downloads from other PCs' in Windows Settings > Windows Update > Advanced Options > Delivery Optimization to completely close this peer-to-peer port."
-        })
-
-    # 4. Port 27036 (Steam In-Home Streaming)
-    if 27036 in exposed_ports:
-        pointers.append({
-            "target": "Port 27036 (Steam Remote Play)",
-            "risk_level": "LOW",
-            "observation": "Steam client listening on 0.0.0.0:27036 for Remote Play LAN discovery.",
-            "pointer": "If you don't use Steam In-Home Remote Play, disable 'Enable Remote Play' in Steam Settings > Remote Play to close this network listener."
-        })
-
-    # 5. Localhost IPC services (Antigravity IDE & Discord RPC)
-    safe_ports = {item["port"]: item for item in scan_results.get("safe_localhost_listeners", [])}
-    if 6463 in safe_ports:
-        pointers.append({
-            "target": "Port 6463 (Discord Local IPC)",
-            "risk_level": "SECURE",
-            "observation": "Discord RPC listening on 127.0.0.1:6463.",
-            "pointer": "Properly bound to loopback interface (127.0.0.1). Unreachable by external network devices."
-        })
-
-    # 6. JARVIS Remote Bridge Whitelist Recommendation
-    pointers.append({
-        "target": "J.A.R.V.I.S. Telegram Remote Bridge",
-        "risk_level": "CRITICAL HARDENING COMPLETED",
-        "observation": "Telegram bot polling receives inbound commands over HTTPS.",
-        "pointer": "Strict chat ID whitelist authentication and Path Traversal protection have been enforced. Unauthorized users cannot issue commands, inspect files, or take webcam photos."
-    })
-
-    return pointers
+    """Synthesizes defensive hardening pointers via `jarvis_rust_core`."""
+    exposed_ports = [int(item["port"]) for item in scan_results.get("exposed_listeners", [])]
+    safe_ports = [int(item["port"]) for item in scan_results.get("safe_localhost_listeners", [])]
+    try:
+        from core.rust_bridge import is_rust_active, _rust_core
+        if is_rust_active() and hasattr(_rust_core, "analyze_exposed_ports_rust"):
+            rows = _rust_core.analyze_exposed_ports_rust(exposed_ports, safe_ports)
+            return [{"target": t, "risk_level": r, "observation": o, "pointer": p} for t, r, o, p in rows]
+    except Exception:
+        pass
+    return []
 
 
 def format_security_scan_report(scan_results: Dict[str, Any]) -> str:

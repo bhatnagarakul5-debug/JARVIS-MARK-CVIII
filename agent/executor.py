@@ -136,7 +136,7 @@ def _call_tool(tool: str, parameters: dict, speak: Callable | None) -> str:
         return daily_briefing(parameters=parameters, player=None) or "Done."
 
     elif tool in ("system_diagnostics", "system_optimizer"):
-        from actions.system_diagnostics import run_system_diagnostics
+        from core.rust_bridge import run_system_diagnostics
         return run_system_diagnostics(parameters=parameters, player=None) or "Done."
 
     elif tool == "spotify_control":
